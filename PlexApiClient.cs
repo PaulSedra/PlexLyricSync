@@ -1,0 +1,83 @@
+﻿using System;
+using System.Linq;
+using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Xml.Linq;
+
+namespace PlexLyricSync;
+
+public record PlexNowPlayingResult(
+    string Artist,
+    string Title,
+    int ViewOffsetMs,
+    int DurationMs,
+    string State
+);
+
+public sealed class PlexApiClient : IDisposable
+{
+    private readonly HttpClient _http;
+    private readonly string _baseUrl;
+
+    public PlexApiClient(string plexBaseUrl, string plexToken)
+    {
+        // Example: "http://192.168.1.100:32400"
+        _baseUrl = plexBaseUrl.TrimEnd('/');
+        _http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
+        _http.DefaultRequestHeaders.TryAddWithoutValidation("X-Plex-Token", plexToken);
+        _http.DefaultRequestHeaders.TryAddWithoutValidation("Cache-Control", "no-cache");
+        _http.DefaultRequestHeaders.TryAddWithoutValidation("Pragma", "no-cache");
+    }
+
+    public async Task<PlexNowPlayingResult?> GetPlexampNowPlayingAsync(CancellationToken ct)
+    {
+        using var req = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/status/sessions");
+        req.Headers.TryAddWithoutValidation("Cache-Control", "no-cache");
+
+        var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+        resp.EnsureSuccessStatusCode();
+        var xml = await resp.Content.ReadAsStringAsync(ct);
+
+        var doc = XDocument.Parse(xml);
+
+        // Find a Plexamp session (prefer state="playing")
+        var plexamp = doc.Descendants("Track")
+            .Select(t => new
+            {
+                Track = t,
+                Player = t.Element("Player"),
+                IsPlexamp = string.Equals(
+                    t.Element("Player")?.Attribute("product")?.Value,
+                    "Plexamp",
+                    StringComparison.OrdinalIgnoreCase),
+                State = t.Element("Player")?.Attribute("state")?.Value ?? ""
+            })
+            .Where(x => x.IsPlexamp)
+            .OrderByDescending(x => string.Equals(x.State, "playing", StringComparison.OrdinalIgnoreCase))
+            .FirstOrDefault();
+
+        if (plexamp is null) return null;
+
+        var tr = plexamp.Track;
+
+        string artist = tr.Attribute("grandparentTitle")?.Value ?? "";
+        string title = tr.Attribute("title")?.Value ?? "";
+        int duration = int.TryParse(tr.Attribute("duration")?.Value, out var d) ? d : 0;
+
+        // Prefer <TranscodeSession time="..."> when present; fallback to viewOffset
+        int offset = 0;
+        var tcs = tr.Element("TranscodeSession");
+        if (!(tcs != null && int.TryParse(tcs.Attribute("time")?.Value, out offset)))
+            offset = int.TryParse(tr.Attribute("viewOffset")?.Value, out var o) ? o : 0;
+
+        string state = plexamp.State;
+
+        if (string.IsNullOrWhiteSpace(artist) && string.IsNullOrWhiteSpace(title))
+            return null;
+
+        return new PlexNowPlayingResult(artist, title, offset, duration, state);
+    }
+
+    public void Dispose() => _http.Dispose();
+}

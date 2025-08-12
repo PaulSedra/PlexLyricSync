@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    x:Class="PlexLyricSync.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="PlexLyricSync">
+
+    <!-- Put visual props on a root panel, not on <Window> -->
+    <Grid x:Name="Root" Background="#CC111111" Padding="14" MinWidth="560" MinHeight="220">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="12"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock x:Name="NowPlaying"
+           FontSize="16" Foreground="White" Text="Waiting for playback…"/>
+        <TextBlock Grid.Row="2" x:Name="LyricLine"
+                   FontSize="24" Foreground="White" TextWrapping="Wrap" />
+        <ProgressBar Grid.Row="3" x:Name="SongProgress"
+                     Height="6" Minimum="0" Maximum="100"/>
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,4,0,0">
+            <TextBlock x:Name="TimeLabel" Foreground="White" FontSize="12"/>
+        </StackPanel>
+
+    </Grid>
+</Window>
