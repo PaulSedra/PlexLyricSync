@@ -3,12 +3,16 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Windows.Graphics;
 
 namespace PlexLyricSync;
 
 public sealed partial class MainWindow : Window
 {
+    private const int startWidth = 480, startHeight = 720;
+
     // TODO: set these
     private string PlexBaseUrl;
     private string PlexToken;
@@ -37,6 +41,16 @@ public sealed partial class MainWindow : Window
     {
         InitializeComponent();
 
+        this.AppWindow.Resize(new SizeInt32(startWidth, startHeight)); // set initial size
+
+        if (this.AppWindow.Presenter is OverlappedPresenter p)
+        {
+            p.SetBorderAndTitleBar(true, false);
+        }
+        ExtendsContentIntoTitleBar = true;
+        SetTitleBar(DragRegion);
+
+        // plex url and token from secerets file
         var secrets = SecretsLoader.LoadSecrets();
         PlexBaseUrl = secrets.PlexBaseUrl;
         PlexToken = secrets.PlexToken;
@@ -128,9 +142,12 @@ public sealed partial class MainWindow : Window
             // Update label (progress is driven by UpdateProgressFromPrediction)
             DispatcherQueue.TryEnqueue(() =>
             {
-                NowPlaying.Text = (!string.IsNullOrWhiteSpace(_artist) || !string.IsNullOrWhiteSpace(_title))
-                    ? $"{_artist} — {_title}"
-                    : "Nothing playing";
+                ArtistBlock.Text = !string.IsNullOrWhiteSpace(_artist)
+                    ? $"{_artist}"
+                    : "";
+                NowPlaying.Text = !string.IsNullOrWhiteSpace(_title)
+                    ? $"{_title}"
+                    : "Peace and quiet";
             });
         }
         catch
