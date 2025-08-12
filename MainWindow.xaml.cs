@@ -173,7 +173,7 @@ public sealed partial class MainWindow : Window
                     if (key != _trackKey) return;
                     _lrc = parsed;
                     _hasSynced = _lrc.Count > 0;
-                    LyricLine.Text = _hasSynced ? "…" : "No synced lyrics.";
+                    LyCurr0.Text = _hasSynced ? "…" : "No synced lyrics.";
                 });
             }
             else if (!string.IsNullOrWhiteSpace(res.Value.plain))
@@ -182,7 +182,7 @@ public sealed partial class MainWindow : Window
                 {
                     if (key != _trackKey) return;
                     _lrc = null; _hasSynced = false;
-                    LyricLine.Text = res.Value.plain;  // unsynced: show all
+                    LyCurr0.Text = res.Value.plain;  // unsynced: show all
                 });
             }
             else
@@ -201,10 +201,9 @@ public sealed partial class MainWindow : Window
         DispatcherQueue.TryEnqueue(() =>
         {
             _lrc = null; _hasSynced = false;
-            LyricLine.Text = msg;
+            LyCurr0.Text = msg;
         });
     }
-
 
     private void UpdateProgressFromPrediction()
     {
@@ -231,13 +230,46 @@ public sealed partial class MainWindow : Window
         // Format mm:ss / mm:ss
         TimeLabel.Text = $"{FormatTime(predicted)} / {FormatTime(_srvDurMs)}";
 
-        // Update synced lyric line, if we have it
+        // display lyrics
         if (_hasSynced && _lrc is not null && _lrc.Count > 0)
         {
             var idx = LrcParser.IndexAt(_lrc, TimeSpan.FromMilliseconds(predicted));
-            if (idx >= 0 && idx < _lrc.Count)
-                LyricLine.Text = _lrc[idx].Text;
+            UpdateSyncedLyricStack(idx);
         }
+        else
+        {
+            UpdateNonSyncedLyricStack(_hasSynced ? "" : LyCurr0?.Text ?? "");
+        }
+    }
+
+    /// <summary>
+    /// Updates the lyric stack when synced lyrics exist. It displays the current lyric line on LyCurr0 as well as the previous 3 and next 3 lines.
+    /// </summary>
+    /// <param name="idx">the current lyric index</param>
+    private void UpdateSyncedLyricStack(int idx)
+    {
+        string L(int i) =>
+            (_lrc is not null && i >= 0 && i < _lrc.Count) ? _lrc[i].Text : string.Empty;
+
+        LyPrev3.Text = L(idx - 3);
+        LyPrev2.Text = L(idx - 2);
+        LyPrev1.Text = L(idx - 1);
+        LyCurr0.Text = L(idx);
+        LyNext1.Text = L(idx + 1);
+        LyNext2.Text = L(idx + 2);
+        LyNext3.Text = L(idx + 3);
+    }
+
+    /// <summary>
+    /// Updates the lyric stack when no synced lyrics exist. It displays the lyrics on LyCurr0.
+    /// </summary>
+    /// <param name="lyrics">lyrics to use</param>
+    private void UpdateNonSyncedLyricStack(string lyrics)
+    {
+        // TODO this method should just be able to read _lrc directly
+        LyPrev3.Text = LyPrev2.Text = LyPrev1.Text =
+        LyNext1.Text = LyNext2.Text = LyNext3.Text = string.Empty;
+        LyCurr0.Text = lyrics;
     }
 
     private static string FormatTime(double ms)
