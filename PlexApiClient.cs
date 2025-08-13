@@ -12,7 +12,8 @@ public record PlexNowPlayingResult(
     string Title,
     int ViewOffsetMs,
     int DurationMs,
-    string State
+    string State,
+    string ClientId
 );
 
 public sealed class PlexApiClient : IDisposable
@@ -22,7 +23,6 @@ public sealed class PlexApiClient : IDisposable
 
     public PlexApiClient(string plexBaseUrl, string plexToken)
     {
-        // Example: "http://192.168.1.100:32400"
         _baseUrl = plexBaseUrl.TrimEnd('/');
         _http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
         _http.DefaultRequestHeaders.TryAddWithoutValidation("X-Plex-Token", plexToken);
@@ -60,6 +60,7 @@ public sealed class PlexApiClient : IDisposable
         if (plexamp is null) return null;
 
         var tr = plexamp.Track;
+        var player = tr.Element("Player");
 
         string artist = tr.Attribute("grandparentTitle")?.Value ?? "";
         string title = tr.Attribute("title")?.Value ?? "";
@@ -72,11 +73,32 @@ public sealed class PlexApiClient : IDisposable
             offset = int.TryParse(tr.Attribute("viewOffset")?.Value, out var o) ? o : 0;
 
         string state = plexamp.State;
+        string clientId = player?.Attribute("machineIdentifier")?.Value ?? "";
 
         if (string.IsNullOrWhiteSpace(artist) && string.IsNullOrWhiteSpace(title))
             return null;
 
-        return new PlexNowPlayingResult(artist, title, offset, duration, state);
+        return new PlexNowPlayingResult(artist, title, offset, duration, state, clientId);
+    }
+
+    /// <summary>
+    /// Asynchronously seeks plexamp player to specified offset.
+    /// </summary>
+    /// <param name="clientId">id of player client to control</param>
+    /// <param name="offsetMs">position to seek to</param>
+    /// <param name="ct">cancellation token</param>
+    /// <returns></returns>
+    public async Task<bool> SeekToAsync(string clientId, int offsetMs, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(clientId)) return false;
+        if (offsetMs < 0) offsetMs = 0;
+
+        using var req = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/player/playback/seekTo?offset={offsetMs}");
+        req.Headers.TryAddWithoutValidation("X-Plex-Target-Client-Identifier", clientId);
+        req.Headers.TryAddWithoutValidation("Cache-Control", "no-cache");
+
+        var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+        return resp.IsSuccessStatusCode;
     }
 
     public void Dispose() => _http.Dispose();

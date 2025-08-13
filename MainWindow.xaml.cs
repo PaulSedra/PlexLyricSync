@@ -1,6 +1,5 @@
-using System;
+ï»¿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Windowing;
@@ -13,36 +12,39 @@ public sealed partial class MainWindow : Window
 {
     private const int startWidth = 480, startHeight = 720;
 
-    // TODO: set these
     private string PlexBaseUrl;
     private string PlexToken;
 
     private PlexApiClient? _plex;
     private CancellationTokenSource? _pollCts;
 
-    // Latest metadata (from Plex)
-    private string _artist = "", _title = "", _srvState = "";
-    private int _srvDurMs = 0, _srvPosMs = 0;
-    // For change detection
-    private string _lastArtist = "", _lastTitle = "";
-    private int _lastDurMs = 0;
+    // latest plex metadata
+    private string _artist = "", _title = "", _state = "";
+    private int _durationMs = 0;
+    private int _viewOffsetMs = 0;
+    private DateTime _viewOffsetUtc = DateTime.UtcNow;
 
-    private DateTime _srvStampUtc = DateTime.UtcNow;
+    // prediction
+    private int _predictedViewOffsetMs = 0;
 
+    // lyrics
     private LyricsClient? _lyrics;
     private List<LrcLine>? _lrc;          // parsed synced lyrics
     private bool _hasSynced = false;
     private string _trackKey = "";        // to know when to (re)fetch
 
+    // seeking
+    private string _clientId = "";       // Plex player's machineIdentifier
+    private int _curLyricIdx = -1;       // current lyric index for click seeking
+
     // Display clock (predicted position between server ticks)
-    private readonly DispatcherTimer _uiTimer = new() { Interval = TimeSpan.FromMilliseconds(100) };
+    private readonly DispatcherTimer _uiTimer = new() { Interval = TimeSpan.FromMilliseconds(300) };
 
     public MainWindow()
     {
         InitializeComponent();
 
-        this.AppWindow.Resize(new SizeInt32(startWidth, startHeight)); // set initial size
-
+        this.AppWindow.Resize(new SizeInt32(startWidth, startHeight));
         if (this.AppWindow.Presenter is OverlappedPresenter p)
         {
             p.SetBorderAndTitleBar(true, false);
@@ -55,7 +57,16 @@ public sealed partial class MainWindow : Window
         PlexBaseUrl = secrets.PlexBaseUrl;
         PlexToken = secrets.PlexToken;
 
-        NowPlaying.Text = "Connecting to Plex…";
+        NowPlaying.Text = "Connecting to Plex";
+
+        // seek by lyric line
+        LyPrev3.Tapped += (_, __) => _ = SeekToRelativeAsync(-3);
+        LyPrev2.Tapped += (_, __) => _ = SeekToRelativeAsync(-2);
+        LyPrev1.Tapped += (_, __) => _ = SeekToRelativeAsync(-1);
+        LyCurr0.Tapped += (_, __) => _ = SeekToRelativeAsync(0);
+        LyNext1.Tapped += (_, __) => _ = SeekToRelativeAsync(+1);
+        LyNext2.Tapped += (_, __) => _ = SeekToRelativeAsync(+2);
+        LyNext3.Tapped += (_, __) => _ = SeekToRelativeAsync(+3);
 
         this.Closed += (_, __) =>
         {
@@ -84,7 +95,7 @@ public sealed partial class MainWindow : Window
 
     private async Task RunPollLoopAsync(CancellationToken ct)
     {
-        // Poll ~3–4 times per second
+        // Poll ~3-4 times per second
         using var timer = new System.Threading.PeriodicTimer(TimeSpan.FromMilliseconds(300));
         while (await timer.WaitForNextTickAsync(ct))
         {
@@ -100,60 +111,62 @@ public sealed partial class MainWindow : Window
 
             if (np is null)
             {
-                _artist = _title = _srvState = "";
-                _srvDurMs = 0;
-                _lastArtist = _lastTitle = "";
-                _lastDurMs = 0;
+                _artist = _title = _state = "";
+                _durationMs = 0;
+                _viewOffsetMs = 0;
+                _viewOffsetUtc = DateTime.UtcNow;
 
-                DispatcherQueue.TryEnqueue(() => NowPlaying.Text = "Nothing playing");
+                _predictedViewOffsetMs = 0;
+
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    ArtistBlock.Text = "";
+                    NowPlaying.Text = "Peace and quiet";
+                    SongProgress.Value = 0;
+                    TimeLabel.Text = "00:00 / 00:00";
+                });
                 return;
             }
 
-            // Always refresh labels & duration
-            _artist = np.Artist;
-            _title = np.Title;
-            _srvDurMs = np.DurationMs;
+            // Capture client id for control (seek)
+            _clientId = np.ClientId ?? _clientId;
 
-            // ---- change detection (compute BEFORE assigning _srvState) ----
-            var newState = np.State ?? "";
-            bool trackChanged = _artist != _lastArtist || _title != _lastTitle || _srvDurMs != _lastDurMs;
-            bool stateChanged = !string.Equals(newState, _srvState, StringComparison.OrdinalIgnoreCase);
-            bool serverMoved = Math.Abs(np.ViewOffsetMs - _srvPosMs) > 1000; // >1s tick/seek
+            // change detection
+            bool trackChanged = np.Artist != _artist || np.Title != _title || np.DurationMs != _durationMs;
+            bool stateChanged = !np.State.Equals(_state, StringComparison.OrdinalIgnoreCase);
+            bool viewOffsetChanged = np.ViewOffsetMs != _viewOffsetMs;
 
-            if (trackChanged || stateChanged || serverMoved)
+            if (trackChanged || stateChanged || viewOffsetChanged)
             {
-                // Rebase snapshot on any meaningful change
-                _srvPosMs = np.ViewOffsetMs;
-                _srvStampUtc = DateTime.UtcNow;
+                // track
+                _artist = np.Artist;
+                _title = np.Title;
+                _durationMs = np.DurationMs;
+                _state = np.State;
 
-                // Remember last known track to detect future changes
-                _lastArtist = _artist;
-                _lastTitle = _title;
-                _lastDurMs = _srvDurMs;
+                // viewOffset
+                _viewOffsetMs = np.ViewOffsetMs;
+                _viewOffsetUtc = DateTime.UtcNow;
 
-                // Build a simple key; can switch to ratingKey later
-                _trackKey = $"{_artist}|{_title}|{_srvDurMs}";
+                // prediction
+                _predictedViewOffsetMs = _viewOffsetMs;
+            }
+
+            if (trackChanged)
+            {
+                _trackKey = $"{_artist}|{_title}|{_durationMs}";
                 _ = FetchLyricsAsync(_artist, _title, _trackKey, ct);
             }
 
-            // Now commit the new state (after we've used the old one to detect change)
-            _srvState = newState;
-
-            // Update label (progress is driven by UpdateProgressFromPrediction)
+            // Update labels
             DispatcherQueue.TryEnqueue(() =>
             {
-                ArtistBlock.Text = !string.IsNullOrWhiteSpace(_artist)
-                    ? $"{_artist}"
-                    : "";
-                NowPlaying.Text = !string.IsNullOrWhiteSpace(_title)
-                    ? $"{_title}"
-                    : "Peace and quiet";
+                ArtistBlock.Text = !string.IsNullOrWhiteSpace(_artist) ? _artist : "";
+                NowPlaying.Text = !string.IsNullOrWhiteSpace(_title) ? _title : "Peace and quiet";
             });
         }
         catch
-        {
-            // ignore transient errors
-        }
+        {}
     }
 
     private async Task FetchLyricsAsync(string artist, string title, string key, CancellationToken ct)
@@ -173,7 +186,7 @@ public sealed partial class MainWindow : Window
                     if (key != _trackKey) return;
                     _lrc = parsed;
                     _hasSynced = _lrc.Count > 0;
-                    LyCurr0.Text = _hasSynced ? "…" : "No synced lyrics.";
+                    LyCurr0.Text = _hasSynced ? "ï¿½" : "No synced lyrics.";
                 });
             }
             else if (!string.IsNullOrWhiteSpace(res.Value.plain))
@@ -207,37 +220,37 @@ public sealed partial class MainWindow : Window
 
     private void UpdateProgressFromPrediction()
     {
-        if (_srvDurMs <= 0)
+        if (_durationMs <= 0)
         {
             SongProgress.Value = 0;
             TimeLabel.Text = "00:00 / 00:00";
             return;
         }
 
-        // Predict current position from last server sample.
-        var elapsed = (DateTime.UtcNow - _srvStampUtc).TotalMilliseconds;
-        double predicted = _srvState.Equals("playing", StringComparison.OrdinalIgnoreCase)
-            ? _srvPosMs + Math.Max(0, elapsed)
-            : _srvPosMs;
+        var elapsed = (DateTime.UtcNow - _viewOffsetUtc).TotalMilliseconds;
+        double predicted = _state.Equals("playing", StringComparison.OrdinalIgnoreCase)
+            ? _predictedViewOffsetMs + Math.Max(0, elapsed)
+            : _predictedViewOffsetMs;
 
-        // Clamp
         if (predicted < 0) predicted = 0;
-        if (predicted > _srvDurMs) predicted = _srvDurMs;
+        if (predicted > _durationMs) predicted = _durationMs;
 
         // Update progress bar
-        SongProgress.Value = predicted / _srvDurMs * 100.0;
+        SongProgress.Value = predicted / _durationMs * 100.0;
 
         // Format mm:ss / mm:ss
-        TimeLabel.Text = $"{FormatTime(predicted)} / {FormatTime(_srvDurMs)}";
+        TimeLabel.Text = $"{FormatTime(predicted)} / {FormatTime(_durationMs)}";
 
-        // display lyrics
+        // display lyrics (and capture current index for seeking)
         if (_hasSynced && _lrc is not null && _lrc.Count > 0)
         {
             var idx = LrcParser.IndexAt(_lrc, TimeSpan.FromMilliseconds(predicted));
+            _curLyricIdx = idx; // keep for clicks
             UpdateSyncedLyricStack(idx);
         }
         else
         {
+            _curLyricIdx = -1;
             UpdateNonSyncedLyricStack(_hasSynced ? "" : LyCurr0?.Text ?? "");
         }
     }
@@ -248,8 +261,7 @@ public sealed partial class MainWindow : Window
     /// <param name="idx">the current lyric index</param>
     private void UpdateSyncedLyricStack(int idx)
     {
-        string L(int i) =>
-            (_lrc is not null && i >= 0 && i < _lrc.Count) ? _lrc[i].Text : string.Empty;
+        string L(int i) => (_lrc is not null && i >= 0 && i < _lrc.Count) ? _lrc[i].Text : string.Empty;
 
         LyPrev3.Text = L(idx - 3);
         LyPrev2.Text = L(idx - 2);
@@ -270,6 +282,54 @@ public sealed partial class MainWindow : Window
         LyPrev3.Text = LyPrev2.Text = LyPrev1.Text =
         LyNext1.Text = LyNext2.Text = LyNext3.Text = string.Empty;
         LyCurr0.Text = lyrics;
+    }
+
+    private async Task SeekToRelativeAsync(int delta)
+    {
+        try
+        {
+            if (_plex is null || _lrc is null || _lrc.Count == 0) return;
+            if (string.IsNullOrWhiteSpace(_clientId)) return;
+            if (_curLyricIdx < 0) return;
+
+            int targetIdx = _curLyricIdx + delta;
+            if (targetIdx < 0 || targetIdx >= _lrc.Count) return;
+
+            int targetMs = (int)_lrc[targetIdx].T.TotalMilliseconds;
+
+            // ask Plex to seek (works even if paused; it stays paused at new position)
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1.5));
+            var ok = await _plex.SeekToAsync(_clientId, targetMs, cts.Token);
+            if (!ok) return;
+
+            // Rebase prediction lane immediately (instant UI response)
+            _predictedViewOffsetMs = targetMs;
+            _viewOffsetUtc = DateTime.UtcNow;
+            // keep _predState as-is (respect pause/play)
+
+            // Move lyrics & progress IMMEDIATELY (no waiting for next tick)
+            _curLyricIdx = targetIdx; // jump to the clicked line
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                // progress/time
+                if (_durationMs > 0)
+                {
+                    SongProgress.Value = Math.Clamp((double)_predictedViewOffsetMs / _durationMs * 100.0, 0, 100);
+                    TimeLabel.Text = $"{FormatTime(_predictedViewOffsetMs)} / {FormatTime(_durationMs)}";
+                }
+                else
+                {
+                    SongProgress.Value = 0;
+                    TimeLabel.Text = "00:00 / 00:00";
+                }
+
+                // lyric stack
+                if (_hasSynced && _lrc is not null && _lrc.Count > 0)
+                    UpdateSyncedLyricStack(_curLyricIdx);
+            });
+        }
+        catch
+        {}
     }
 
     private static string FormatTime(double ms)
