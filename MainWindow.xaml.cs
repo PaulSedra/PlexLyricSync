@@ -22,10 +22,10 @@ public sealed partial class MainWindow : Window
     private string _artist = "", _title = "", _state = "";
     private int _durationMs = 0;
     private int _viewOffsetMs = 0;
-    private DateTime _viewOffsetUtc = DateTime.UtcNow;
 
     // prediction
     private int _predictedViewOffsetMs = 0;
+    private DateTime _predictedViewOffsetUtc = DateTime.UtcNow;
 
     // lyrics
     private LyricsClient? _lyrics;
@@ -38,7 +38,7 @@ public sealed partial class MainWindow : Window
     private int _curLyricIdx = -1;       // current lyric index for click seeking
 
     // Display clock (predicted position between server ticks)
-    private readonly DispatcherTimer _uiTimer = new() { Interval = TimeSpan.FromMilliseconds(300) };
+    private readonly DispatcherTimer _uiTimer = new() { Interval = TimeSpan.FromMilliseconds(200) };
 
     public MainWindow()
     {
@@ -95,8 +95,8 @@ public sealed partial class MainWindow : Window
 
     private async Task RunPollLoopAsync(CancellationToken ct)
     {
-        // Poll ~3-4 times per second
-        using var timer = new System.Threading.PeriodicTimer(TimeSpan.FromMilliseconds(300));
+        // poll once per second
+        using var timer = new System.Threading.PeriodicTimer(TimeSpan.FromMilliseconds(1000));
         while (await timer.WaitForNextTickAsync(ct))
         {
             await PollPlexOnceAsync(ct);
@@ -107,6 +107,7 @@ public sealed partial class MainWindow : Window
     {
         try
         {
+            DateTime now = DateTime.UtcNow;
             var np = await _plex!.GetPlexampNowPlayingAsync(ct);
 
             if (np is null)
@@ -114,17 +115,11 @@ public sealed partial class MainWindow : Window
                 _artist = _title = _state = "";
                 _durationMs = 0;
                 _viewOffsetMs = 0;
-                _viewOffsetUtc = DateTime.UtcNow;
 
                 _predictedViewOffsetMs = 0;
+                _predictedViewOffsetUtc = now;
 
-                DispatcherQueue.TryEnqueue(() =>
-                {
-                    ArtistBlock.Text = "";
-                    NowPlaying.Text = "Peace and quiet";
-                    SongProgress.Value = 0;
-                    TimeLabel.Text = "00:00 / 00:00";
-                });
+                DispatcherQueue.TryEnqueue(UpdateTrackInformation);
                 return;
             }
 
@@ -146,24 +141,21 @@ public sealed partial class MainWindow : Window
 
                 // viewOffset
                 _viewOffsetMs = np.ViewOffsetMs;
-                _viewOffsetUtc = DateTime.UtcNow;
 
                 // prediction
                 _predictedViewOffsetMs = _viewOffsetMs;
+                _predictedViewOffsetUtc = now;
             }
 
             if (trackChanged)
             {
+                _curLyricIdx = -1;
                 _trackKey = $"{_artist}|{_title}|{_durationMs}";
-                _ = FetchLyricsAsync(_artist, _title, _trackKey, ct);
+                await FetchLyricsAsync(_artist, _title, _trackKey, ct).ConfigureAwait(false);
             }
 
             // Update labels
-            DispatcherQueue.TryEnqueue(() =>
-            {
-                ArtistBlock.Text = !string.IsNullOrWhiteSpace(_artist) ? _artist : "";
-                NowPlaying.Text = !string.IsNullOrWhiteSpace(_title) ? _title : "Peace and quiet";
-            });
+            DispatcherQueue.TryEnqueue(UpdateTrackInformation);
         }
         catch
         {}
@@ -175,18 +167,20 @@ public sealed partial class MainWindow : Window
         {
             if (_lyrics is null) return;
             var res = await _lyrics.GetAsync(title, artist, ct);
-            if (res is null) { SetNoLyrics("No lyrics found."); return; }
+            
+            if (res is null) {
+                SetNoLyrics("No lyrics found.");
+                return;
+            }
 
             if (!string.IsNullOrWhiteSpace(res.Value.syncedLrc))
             {
                 var parsed = LrcParser.Parse(res.Value.syncedLrc!);
                 DispatcherQueue.TryEnqueue(() =>
                 {
-                    // ensure still same track
                     if (key != _trackKey) return;
                     _lrc = parsed;
-                    _hasSynced = _lrc.Count > 0;
-                    LyCurr0.Text = _hasSynced ? "�" : "No synced lyrics.";
+                    _hasSynced = true;
                 });
             }
             else if (!string.IsNullOrWhiteSpace(res.Value.plain))
@@ -194,8 +188,9 @@ public sealed partial class MainWindow : Window
                 DispatcherQueue.TryEnqueue(() =>
                 {
                     if (key != _trackKey) return;
-                    _lrc = null; _hasSynced = false;
-                    LyCurr0.Text = res.Value.plain;  // unsynced: show all
+                    _lrc = null;
+                    _hasSynced = false;
+                    LyCurr0.Text = res.Value.plain;
                 });
             }
             else
@@ -205,7 +200,7 @@ public sealed partial class MainWindow : Window
         }
         catch
         {
-            SetNoLyrics("No lyrics.");
+            SetNoLyrics("Unable to fetch lyrics.");
         }
     }
 
@@ -220,38 +215,33 @@ public sealed partial class MainWindow : Window
 
     private void UpdateProgressFromPrediction()
     {
+        if (_state == "paused") return;
         if (_durationMs <= 0)
         {
-            SongProgress.Value = 0;
-            TimeLabel.Text = "00:00 / 00:00";
+            UpdateTrackInformation();
             return;
         }
 
-        var elapsed = (DateTime.UtcNow - _viewOffsetUtc).TotalMilliseconds;
-        double predicted = _state.Equals("playing", StringComparison.OrdinalIgnoreCase)
-            ? _predictedViewOffsetMs + Math.Max(0, elapsed)
-            : _predictedViewOffsetMs;
+        DateTime now = DateTime.UtcNow;
+        int elapsed = (int)Math.Ceiling((now - _predictedViewOffsetUtc).TotalMilliseconds);
+        _predictedViewOffsetMs = _state.Equals("playing", StringComparison.OrdinalIgnoreCase)
+            ? Math.Clamp(_predictedViewOffsetMs + Math.Max(0, elapsed), 0, _durationMs)
+            : _predictedViewOffsetMs; ;
+        _predictedViewOffsetUtc = now;
 
-        if (predicted < 0) predicted = 0;
-        if (predicted > _durationMs) predicted = _durationMs;
-
-        // Update progress bar
-        SongProgress.Value = predicted / _durationMs * 100.0;
-
-        // Format mm:ss / mm:ss
-        TimeLabel.Text = $"{FormatTime(predicted)} / {FormatTime(_durationMs)}";
+        UpdateTrackInformation();
 
         // display lyrics (and capture current index for seeking)
         if (_hasSynced && _lrc is not null && _lrc.Count > 0)
         {
-            var idx = LrcParser.IndexAt(_lrc, TimeSpan.FromMilliseconds(predicted));
+            var idx = LrcParser.IndexAt(_lrc, TimeSpan.FromMilliseconds(_predictedViewOffsetMs));
             _curLyricIdx = idx; // keep for clicks
             UpdateSyncedLyricStack(idx);
         }
         else
         {
             _curLyricIdx = -1;
-            UpdateNonSyncedLyricStack(_hasSynced ? "" : LyCurr0?.Text ?? "");
+            UpdateNonSyncedLyricStack(_hasSynced ? "" : LyCurr0.Text ?? "");
         }
     }
 
@@ -304,25 +294,14 @@ public sealed partial class MainWindow : Window
 
             // Rebase prediction lane immediately (instant UI response)
             _predictedViewOffsetMs = targetMs;
-            _viewOffsetUtc = DateTime.UtcNow;
+            _predictedViewOffsetUtc = DateTime.UtcNow;
             // keep _predState as-is (respect pause/play)
 
             // Move lyrics & progress IMMEDIATELY (no waiting for next tick)
             _curLyricIdx = targetIdx; // jump to the clicked line
             DispatcherQueue.TryEnqueue(() =>
             {
-                // progress/time
-                if (_durationMs > 0)
-                {
-                    SongProgress.Value = Math.Clamp((double)_predictedViewOffsetMs / _durationMs * 100.0, 0, 100);
-                    TimeLabel.Text = $"{FormatTime(_predictedViewOffsetMs)} / {FormatTime(_durationMs)}";
-                }
-                else
-                {
-                    SongProgress.Value = 0;
-                    TimeLabel.Text = "00:00 / 00:00";
-                }
-
+                UpdateTrackInformation();
                 // lyric stack
                 if (_hasSynced && _lrc is not null && _lrc.Count > 0)
                     UpdateSyncedLyricStack(_curLyricIdx);
@@ -330,6 +309,19 @@ public sealed partial class MainWindow : Window
         }
         catch
         {}
+    }
+
+    /// <summary>
+    /// Updates ArtistBlock, NowPlaying, SongProgress, and TimeLabel
+    /// </summary>
+    private void UpdateTrackInformation()
+    {
+        ArtistBlock.Text = !string.IsNullOrWhiteSpace(_artist) ? _artist : "";
+        NowPlaying.Text = !string.IsNullOrWhiteSpace(_title) ? _title : "Peace and quiet";
+        SongProgress.Value = _durationMs == 0
+            ? 0
+            : Math.Clamp((double)_predictedViewOffsetMs / _durationMs * 100.0, 0, 100);
+        TimeLabel.Text = $"{FormatTime(_predictedViewOffsetMs)} / {FormatTime(_durationMs)}";
     }
 
     private static string FormatTime(double ms)
