@@ -4,7 +4,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Input;
 using Windows.Graphics;
+using Windows.System;
 
 namespace PlexLyricSync;
 
@@ -67,6 +69,9 @@ public sealed partial class MainWindow : Window
         LyNext1.Tapped += (_, __) => _ = SeekToRelativeAsync(+1);
         LyNext2.Tapped += (_, __) => _ = SeekToRelativeAsync(+2);
         LyNext3.Tapped += (_, __) => _ = SeekToRelativeAsync(+3);
+
+        Root.KeyDown += Root_KeyDown;
+        Root.Loaded += (_, __) => Root.Focus(FocusState.Programmatic);
 
         this.Closed += (_, __) =>
         {
@@ -243,6 +248,52 @@ public sealed partial class MainWindow : Window
             _curLyricIdx = -1;
             UpdateNonSyncedLyricStack(_hasSynced ? "" : LyCurr0.Text ?? "");
         }
+    }
+
+    private async void Root_KeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        try
+        {
+            if (e.Key == VirtualKey.Right)
+            {
+                await SkipAsync(true);
+                e.Handled = true;
+            }
+            else if (e.Key == VirtualKey.Left)
+            {
+                await SkipAsync(false);
+                e.Handled = true;
+            }
+        }
+        catch
+        { }
+    }
+
+    private async void NextButton_Click(object sender, RoutedEventArgs e)
+    {
+        await SkipAsync(true);
+        Root.Focus(FocusState.Programmatic);
+    }
+
+    private async void PrevButton_Click(object sender, RoutedEventArgs e)
+    {
+        await SkipAsync(false);
+        Root.Focus(FocusState.Programmatic);
+    }
+
+    private async Task SkipAsync(bool forward)
+    {
+        try
+        {
+            if (_plex is null || string.IsNullOrWhiteSpace(_clientId)) return;
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1.5));
+            if (forward)
+                await _plex.SkipNextAsync(_clientId, cts.Token);
+            else
+                await _plex.SkipPreviousAsync(_clientId, cts.Token);
+        }
+        catch
+        { }
     }
 
     /// <summary>

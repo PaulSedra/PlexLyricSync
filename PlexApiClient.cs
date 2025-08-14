@@ -101,5 +101,23 @@ public sealed class PlexApiClient : IDisposable
         return resp.IsSuccessStatusCode;
     }
 
+    public Task<bool> SkipNextAsync(string clientId, CancellationToken ct) =>
+        SendPlaybackCommandAsync(clientId, "skipNext", ct);
+
+    public Task<bool> SkipPreviousAsync(string clientId, CancellationToken ct) =>
+        SendPlaybackCommandAsync(clientId, "skipPrevious", ct);
+
+    private async Task<bool> SendPlaybackCommandAsync(string clientId, string command, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(clientId)) return false;
+
+        using var req = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/player/playback/{command}");
+        req.Headers.TryAddWithoutValidation("X-Plex-Target-Client-Identifier", clientId);
+        req.Headers.TryAddWithoutValidation("Cache-Control", "no-cache");
+
+        var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+        return resp.IsSuccessStatusCode;
+    }
+
     public void Dispose() => _http.Dispose();
 }

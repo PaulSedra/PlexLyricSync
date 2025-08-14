@@ -48,8 +48,12 @@
                 <TextBlock x:Name="LyNext3" FontSize="16" Foreground="White" Opacity="0.35" TextWrapping="WrapWholeWords" TextAlignment="Center"/>
             </StackPanel>
 
-            <!-- SongProgress/TimeLabel -->
+            <!-- Controls/SongProgress/TimeLabel -->
             <StackPanel Grid.Row="2" Spacing="6">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="12">
+                    <Button x:Name="PrevButton" Content="⏮" Click="PrevButton_Click" />
+                    <Button x:Name="NextButton" Content="⏭" Click="NextButton_Click" />
+                </StackPanel>
                 <ProgressBar
                x:Name="SongProgress"
                Height="6"
