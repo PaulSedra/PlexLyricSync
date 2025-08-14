@@ -4,7 +4,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Windows.Graphics;
+using Windows.System;
 
 namespace PlexLyricSync;
 
@@ -158,7 +160,7 @@ public sealed partial class MainWindow : Window
             DispatcherQueue.TryEnqueue(UpdateTrackInformation);
         }
         catch
-        {}
+        { }
     }
 
     private async Task FetchLyricsAsync(string artist, string title, string key, CancellationToken ct)
@@ -167,7 +169,7 @@ public sealed partial class MainWindow : Window
         {
             if (_lyrics is null) return;
             var res = await _lyrics.GetAsync(title, artist, ct);
-            
+
             if (res is null) {
                 SetNoLyrics("No lyrics found.");
                 return;
@@ -308,7 +310,7 @@ public sealed partial class MainWindow : Window
             });
         }
         catch
-        {}
+        { }
     }
 
     /// <summary>
@@ -322,11 +324,68 @@ public sealed partial class MainWindow : Window
             ? 0
             : Math.Clamp((double)_predictedViewOffsetMs / _durationMs * 100.0, 0, 100);
         TimeLabel.Text = $"{FormatTime(_predictedViewOffsetMs)} / {FormatTime(_durationMs)}";
+        PlayPauseIcon.Symbol = _state.Equals("playing", StringComparison.OrdinalIgnoreCase) ? Symbol.Pause : Symbol.Play;
     }
 
     private static string FormatTime(double ms)
     {
         var ts = TimeSpan.FromMilliseconds(ms);
         return $"{(int)ts.TotalMinutes:D2}:{ts.Seconds:D2}";
+    }
+
+    private async void PlayPauseButton_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (_plex is null || string.IsNullOrWhiteSpace(_clientId)) return;
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1.5));
+            bool ok;
+            if (_state.Equals("playing", StringComparison.OrdinalIgnoreCase))
+            {
+                UpdateProgressFromPrediction();
+                ok = await _plex.PauseAsync(_clientId, cts.Token);
+                if (!ok) return;
+                _state = "paused";
+            }
+            else
+            {
+                ok = await _plex.PlayAsync(_clientId, cts.Token);
+                if (!ok) return;
+                _state = "playing";
+                _predictedViewOffsetUtc = DateTime.UtcNow;
+            }
+
+            DispatcherQueue.TryEnqueue(UpdateTrackInformation);
+        }
+        catch
+        {}
+    }
+
+    private async void NextButton_Click(object sender, RoutedEventArgs e)
+    {
+        await SkipAsync(true);
+        Root.Focus(FocusState.Programmatic);
+    }
+
+    private async void PreviousButton_Click(object sender, RoutedEventArgs e)
+    {
+        await SkipAsync(false);
+        Root.Focus(FocusState.Programmatic);
+    }
+
+    private async Task SkipAsync(bool forward)
+    {
+        try
+        {
+            if (_plex is null || string.IsNullOrWhiteSpace(_clientId)) return;
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1.5));
+            if (forward)
+                await _plex.SkipNextAsync(_clientId, cts.Token);
+            else
+                await _plex.SkipPreviousAsync(_clientId, cts.Token);
+        }
+        catch
+        { }
     }
 }
