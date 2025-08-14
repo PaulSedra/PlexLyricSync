@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Controls;
 using Windows.Graphics;
 using Windows.System;
 
@@ -328,7 +329,7 @@ public sealed partial class MainWindow : Window
             ? 0
             : Math.Clamp((double)_predictedViewOffsetMs / _durationMs * 100.0, 0, 100);
         TimeLabel.Text = $"{FormatTime(_predictedViewOffsetMs)} / {FormatTime(_durationMs)}";
-        PlayPauseButton.Content = _state.Equals("playing", StringComparison.OrdinalIgnoreCase) ? "Pause" : "Play";
+        PlayPauseIcon.Symbol = _state.Equals("playing", StringComparison.OrdinalIgnoreCase) ? Symbol.Pause : Symbol.Play;
     }
 
     private static string FormatTime(double ms)

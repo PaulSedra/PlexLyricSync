@@ -52,9 +52,10 @@
             <StackPanel Grid.Row="2" Spacing="6">
                 <Button
                x:Name="PlayPauseButton"
-               Content="Play"
                Click="PlayPauseButton_Click"
-               HorizontalAlignment="Center"/>
+               HorizontalAlignment="Center">
+                    <SymbolIcon x:Name="PlayPauseIcon" Symbol="Play"/>
+                </Button>
                 <ProgressBar
                x:Name="SongProgress"
                Height="6"
