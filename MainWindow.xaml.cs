@@ -4,7 +4,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Input;
 using Windows.Graphics;
+using Windows.System;
 
 namespace PlexLyricSync;
 
@@ -74,6 +76,10 @@ public sealed partial class MainWindow : Window
             _plex?.Dispose();
             _uiTimer.Stop();
         };
+
+        this.KeyDown += MainWindow_KeyDown;
+
+        PlayPauseButton.Click += PlayPauseButton_Click;
 
         _ = InitAsync();
     }
@@ -322,11 +328,56 @@ public sealed partial class MainWindow : Window
             ? 0
             : Math.Clamp((double)_predictedViewOffsetMs / _durationMs * 100.0, 0, 100);
         TimeLabel.Text = $"{FormatTime(_predictedViewOffsetMs)} / {FormatTime(_durationMs)}";
+        PlayPauseButton.Content = _state.Equals("playing", StringComparison.OrdinalIgnoreCase) ? "Pause" : "Play";
     }
 
     private static string FormatTime(double ms)
     {
         var ts = TimeSpan.FromMilliseconds(ms);
         return $"{(int)ts.TotalMinutes:D2}:{ts.Seconds:D2}";
+    }
+
+    private async void MainWindow_KeyDown(object sender, KeyRoutedEventArgs e)
+    {
+        if (e.Key == VirtualKey.Space)
+        {
+            e.Handled = true;
+            await TogglePlayPauseAsync();
+        }
+    }
+
+    private async void PlayPauseButton_Click(object sender, RoutedEventArgs e)
+    {
+        await TogglePlayPauseAsync();
+    }
+
+    private async Task TogglePlayPauseAsync()
+    {
+        try
+        {
+            if (_plex is null || string.IsNullOrWhiteSpace(_clientId)) return;
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1.5));
+            bool ok;
+            if (_state.Equals("playing", StringComparison.OrdinalIgnoreCase))
+            {
+                UpdateProgressFromPrediction();
+                ok = await _plex.PauseAsync(_clientId, cts.Token);
+                if (!ok) return;
+                _state = "paused";
+            }
+            else
+            {
+                ok = await _plex.PlayAsync(_clientId, cts.Token);
+                if (!ok) return;
+                _state = "playing";
+                _predictedViewOffsetUtc = DateTime.UtcNow;
+            }
+
+            DispatcherQueue.TryEnqueue(UpdateTrackInformation);
+        }
+        catch
+        {
+        }
     }
 }

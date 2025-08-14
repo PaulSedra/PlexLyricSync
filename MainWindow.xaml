@@ -48,21 +48,24 @@
                 <TextBlock x:Name="LyNext3" FontSize="16" Foreground="White" Opacity="0.35" TextWrapping="WrapWholeWords" TextAlignment="Center"/>
             </StackPanel>
 
-            <!-- SongProgress/TimeLabel -->
+            <!-- Play/Pause button and progress -->
             <StackPanel Grid.Row="2" Spacing="6">
+                <Button
+               x:Name="PlayPauseButton"
+               Content="Play"
+               Click="PlayPauseButton_Click"
+               HorizontalAlignment="Center"/>
                 <ProgressBar
                x:Name="SongProgress"
                Height="6"
                Minimum="0"
-               Maximum="100"
-           />
+               Maximum="100"/>
                 <TextBlock
                x:Name="TimeLabel"
                Foreground="#E6FFFFFF"
                Opacity="0.9"
                FontSize="12"
-               HorizontalAlignment="Right"
-           />
+               HorizontalAlignment="Right"/>
             </StackPanel>
         </Grid>
     </Grid>
