@@ -5,6 +5,8 @@ VisualStudioVersion = 17.14.36401.2 d17.14
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PlexLyricSync", "PlexLyricSync.csproj", "{26BF9D1B-F74C-4109-B2B7-9A4537EA067C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PlexLyricSync.Tests", "PlexLyricSync.Tests\\PlexLyricSync.Tests.csproj", "{B6E844F6-BAA0-4C73-BA0C-AB51F356329F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM64 = Debug|ARM64
@@ -29,11 +31,23 @@ Global
 		{26BF9D1B-F74C-4109-B2B7-9A4537EA067C}.Release|ARM64.Deploy.0 = Release|ARM64
 		{26BF9D1B-F74C-4109-B2B7-9A4537EA067C}.Release|x64.ActiveCfg = Release|x64
 		{26BF9D1B-F74C-4109-B2B7-9A4537EA067C}.Release|x64.Build.0 = Release|x64
-		{26BF9D1B-F74C-4109-B2B7-9A4537EA067C}.Release|x64.Deploy.0 = Release|x64
-		{26BF9D1B-F74C-4109-B2B7-9A4537EA067C}.Release|x86.ActiveCfg = Release|x86
-		{26BF9D1B-F74C-4109-B2B7-9A4537EA067C}.Release|x86.Build.0 = Release|x86
-		{26BF9D1B-F74C-4109-B2B7-9A4537EA067C}.Release|x86.Deploy.0 = Release|x86
-	EndGlobalSection
+                {26BF9D1B-F74C-4109-B2B7-9A4537EA067C}.Release|x64.Deploy.0 = Release|x64
+                {26BF9D1B-F74C-4109-B2B7-9A4537EA067C}.Release|x86.ActiveCfg = Release|x86
+                {26BF9D1B-F74C-4109-B2B7-9A4537EA067C}.Release|x86.Build.0 = Release|x86
+                {26BF9D1B-F74C-4109-B2B7-9A4537EA067C}.Release|x86.Deploy.0 = Release|x86
+                {B6E844F6-BAA0-4C73-BA0C-AB51F356329F}.Debug|ARM64.ActiveCfg = Debug|Any CPU
+                {B6E844F6-BAA0-4C73-BA0C-AB51F356329F}.Debug|ARM64.Build.0 = Debug|Any CPU
+                {B6E844F6-BAA0-4C73-BA0C-AB51F356329F}.Debug|x64.ActiveCfg = Debug|Any CPU
+                {B6E844F6-BAA0-4C73-BA0C-AB51F356329F}.Debug|x64.Build.0 = Debug|Any CPU
+                {B6E844F6-BAA0-4C73-BA0C-AB51F356329F}.Debug|x86.ActiveCfg = Debug|Any CPU
+                {B6E844F6-BAA0-4C73-BA0C-AB51F356329F}.Debug|x86.Build.0 = Debug|Any CPU
+                {B6E844F6-BAA0-4C73-BA0C-AB51F356329F}.Release|ARM64.ActiveCfg = Release|Any CPU
+                {B6E844F6-BAA0-4C73-BA0C-AB51F356329F}.Release|ARM64.Build.0 = Release|Any CPU
+                {B6E844F6-BAA0-4C73-BA0C-AB51F356329F}.Release|x64.ActiveCfg = Release|Any CPU
+                {B6E844F6-BAA0-4C73-BA0C-AB51F356329F}.Release|x64.Build.0 = Release|Any CPU
+                {B6E844F6-BAA0-4C73-BA0C-AB51F356329F}.Release|x86.ActiveCfg = Release|Any CPU
+                {B6E844F6-BAA0-4C73-BA0C-AB51F356329F}.Release|x86.Build.0 = Release|Any CPU
+        EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
