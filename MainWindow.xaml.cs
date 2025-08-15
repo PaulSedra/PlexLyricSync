@@ -217,7 +217,6 @@ public sealed partial class MainWindow : Window
 
     private void UpdateProgressFromPrediction()
     {
-        if (_state == "paused") return;
         if (_durationMs <= 0)
         {
             UpdateTrackInformation();
@@ -228,7 +227,7 @@ public sealed partial class MainWindow : Window
         int elapsed = (int)Math.Ceiling((now - _predictedViewOffsetUtc).TotalMilliseconds);
         _predictedViewOffsetMs = _state.Equals("playing", StringComparison.OrdinalIgnoreCase)
             ? Math.Clamp(_predictedViewOffsetMs + Math.Max(0, elapsed), 0, _durationMs)
-            : _predictedViewOffsetMs; ;
+            : _predictedViewOffsetMs;
         _predictedViewOffsetUtc = now;
 
         UpdateTrackInformation();
@@ -282,7 +281,6 @@ public sealed partial class MainWindow : Window
         {
             if (_plex is null || _lrc is null || _lrc.Count == 0) return;
             if (string.IsNullOrWhiteSpace(_clientId)) return;
-            if (_curLyricIdx < 0) return;
 
             int targetIdx = _curLyricIdx + delta;
             if (targetIdx < 0 || targetIdx >= _lrc.Count) return;
