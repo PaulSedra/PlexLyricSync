@@ -50,7 +50,7 @@
 
             <!-- Controls/SongProgress/TimeLabel -->
             <StackPanel Grid.Row="2" Spacing="6">
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="12">
+                <StackPanel x:Name="Controls" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="12">
                     <Button
                         x:Name="PreviousButton"
                         Click="PreviousButton_Click">
@@ -68,12 +68,20 @@
                          <SymbolIcon x:Name="NextIcon" Symbol="Next"/>
                     </Button>
                 </StackPanel>
-                <ProgressBar
+                <Border
                     x:Name="SongProgress"
                     Height="6"
-                    Minimum="0"
-                    Maximum="100"
-                />
+                    Background="#44FFFFFF"
+                    CornerRadius="3"
+                    PointerPressed="SongProgress_PointerPressed"
+                    PointerMoved="SongProgress_PointerMoved"
+                    PointerReleased="SongProgress_PointerReleased">
+                    <Border
+                        x:Name="SongProgressFill"
+                        Background="{ThemeResource SystemAccentColor}"
+                        HorizontalAlignment="Left"
+                        Width="0"/>
+                </Border>
                 <TextBlock
                     x:Name="TimeLabel"
                     Foreground="#E6FFFFFF"

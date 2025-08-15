@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
 using Windows.Graphics;
 using Windows.System;
 
@@ -38,6 +39,7 @@ public sealed partial class MainWindow : Window
     // seeking
     private string _clientId = "";       // Plex player's machineIdentifier
     private int _curLyricIdx = -1;       // current lyric index for click seeking
+    private bool _isSeeking = false;     // true while user is dragging the progress bar
 
     // Display clock (predicted position between server ticks)
     private readonly DispatcherTimer _uiTimer = new() { Interval = TimeSpan.FromMilliseconds(200) };
@@ -312,15 +314,99 @@ public sealed partial class MainWindow : Window
     }
 
     /// <summary>
+    /// Handles song progress bar drag behavior.
+    /// </summary>
+    /// <param name="progressBar">the progress bar element</param>
+    /// <param name="pointerEvent">the mouse pointer</param>
+    private async Task SeekFromPointerAsync(FrameworkElement progressBar, PointerRoutedEventArgs pointerEvent)
+    {
+        try
+        {
+            if (_plex is null || string.IsNullOrWhiteSpace(_clientId)) return;
+            if (_durationMs <= 0) return;
+
+            double x = pointerEvent.GetCurrentPoint(progressBar).Position.X;
+            double fraction = progressBar.ActualWidth > 0 ? x / progressBar.ActualWidth : 0;
+            fraction = Math.Clamp(fraction, 0, 1);
+            int targetMs = (int)(_durationMs * fraction);
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1.5));
+            if (!_isSeeking) {
+                var ok = await _plex.SeekToAsync(_clientId, targetMs, cts.Token);
+                if (!ok) return;
+            }
+
+            _predictedViewOffsetMs = targetMs;
+            _predictedViewOffsetUtc = DateTime.UtcNow;
+
+            if (_hasSynced && _lrc is not null && _lrc.Count > 0)
+                _curLyricIdx = LrcParser.IndexAt(_lrc, TimeSpan.FromMilliseconds(targetMs));
+            else
+                _curLyricIdx = -1;
+
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                UpdateTrackInformation();
+                if (_hasSynced && _lrc is not null && _lrc.Count > 0)
+                    UpdateSyncedLyricStack(_curLyricIdx);
+            });
+        }
+        catch
+        { }
+    }
+
+    /// <summary>
+    /// Handles progress bar drag start.
+    /// On drag start the app UI is updated but the plex client is not.
+    /// </summary>
+    /// <param name="sender">the sender object</param>
+    /// <param name="pointerEvent">the mouse pointer</param>
+    private async void SongProgress_PointerPressed(object sender, PointerRoutedEventArgs pointerEvent)
+    {
+        _isSeeking = true;
+        var progressBar = (FrameworkElement)sender;
+        progressBar.CapturePointer(pointerEvent.Pointer);
+        await SeekFromPointerAsync(progressBar, pointerEvent);
+    }
+
+    /// <summary>
+    /// Handles dragging across the progress bar.
+    /// On drag the app UI is updated but the plex client is not.
+    /// </summary>
+    /// <param name="sender">the sender object</param>
+    /// <param name="pointerEvent">the mouse pointer</param>
+    private async void SongProgress_PointerMoved(object sender, PointerRoutedEventArgs pointerEvent)
+    {
+        if (!_isSeeking) return;
+        var progressBar = (FrameworkElement)sender;
+        await SeekFromPointerAsync(progressBar, pointerEvent);
+    }
+
+    /// <summary>
+    /// Handles progress bar drag end.
+    /// On drag end the plex client is updated.
+    /// </summary>
+    /// <param name="sender">the sender object</param>
+    /// <param name="pointerEvent">the mouse pointer</param>
+    private async void SongProgress_PointerReleased(object sender, PointerRoutedEventArgs pointerEvent)
+    {
+        if (!_isSeeking) return;
+        _isSeeking = false;
+        var progressBar = (FrameworkElement)sender;
+        progressBar.ReleasePointerCaptures();
+        await SeekFromPointerAsync(progressBar, pointerEvent);
+    }
+
+    /// <summary>
     /// Updates ArtistBlock, NowPlaying, SongProgress, and TimeLabel
     /// </summary>
     private void UpdateTrackInformation()
     {
         ArtistBlock.Text = !string.IsNullOrWhiteSpace(_artist) ? _artist : "";
         NowPlaying.Text = !string.IsNullOrWhiteSpace(_title) ? _title : "Peace and quiet";
-        SongProgress.Value = _durationMs == 0
+        SongProgressFill.Width = _durationMs == 0
             ? 0
-            : Math.Clamp((double)_predictedViewOffsetMs / _durationMs * 100.0, 0, 100);
+            : SongProgress.ActualWidth * Math.Clamp((double)_predictedViewOffsetMs / _durationMs, 0, 1);
         TimeLabel.Text = $"{FormatTime(_predictedViewOffsetMs)} / {FormatTime(_durationMs)}";
         PlayPauseIcon.Symbol = _state.Equals("playing", StringComparison.OrdinalIgnoreCase) ? Symbol.Pause : Symbol.Play;
     }
