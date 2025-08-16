@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
@@ -15,6 +18,7 @@ public sealed partial class LyricsView : UserControl
     internal bool _hasSynced = false;
     internal string _trackKey = "";
     internal int _curLyricIdx = -1;
+    internal string? _localPath;
 
     public Func<int, Task>? SeekToAsync { get; set; }
 
@@ -29,6 +33,7 @@ public sealed partial class LyricsView : UserControl
         LyNext1.Tapped += async (_, __) => await SeekToRelativeAsync(+1);
         LyNext2.Tapped += async (_, __) => await SeekToRelativeAsync(+2);
         LyNext3.Tapped += async (_, __) => await SeekToRelativeAsync(+3);
+        LySource.Tapped += OnLySourceTapped;
     }
 
     public async Task FetchLyricsAsync(string artist, string album, string title, string key, CancellationToken ct)
@@ -52,9 +57,22 @@ public sealed partial class LyricsView : UserControl
             DispatcherQueue.TryEnqueue(() =>
             {
                 if (key != _trackKey) return;
-                LySource.Text = res.Value.fromCache && !string.IsNullOrWhiteSpace(res.Value.path)
-                    ? $"Local: {res.Value.path}"
-                    : "Remote";
+                if (res.Value.fromCache && !string.IsNullOrWhiteSpace(res.Value.path))
+                {
+                    _localPath = res.Value.path;
+                    var idx = _localPath.IndexOf("lyrics", StringComparison.OrdinalIgnoreCase);
+                    var disp = idx >= 0 ? _localPath[idx..].Replace('\\', '/') : _localPath;
+                    LySource.Text = "Local";
+                    LySource.ToolTip = disp;
+                    LySource.Cursor = InputSystemCursor.Create(InputSystemCursorShape.Hand);
+                }
+                else
+                {
+                    _localPath = null;
+                    LySource.Text = "Remote";
+                    LySource.ToolTip = null;
+                    LySource.Cursor = null;
+                }
             });
 
             if (!string.IsNullOrWhiteSpace(res.Value.syncedLrc))
@@ -96,6 +114,9 @@ public sealed partial class LyricsView : UserControl
             _hasSynced = false;
             LyCurr0.Text = msg;
             LySource.Text = string.Empty;
+            LySource.ToolTip = null;
+            LySource.Cursor = null;
+            _localPath = null;
         });
     }
 
@@ -162,6 +183,22 @@ public sealed partial class LyricsView : UserControl
             {
                 await SeekToAsync(targetMs);
             }
+        }
+        catch { }
+    }
+
+    private void OnLySourceTapped(object sender, TappedRoutedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_localPath)) return;
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "explorer.exe",
+                Arguments = $"/select,\"{_localPath}\"",
+                UseShellExecute = true
+            };
+            Process.Start(psi);
         }
         catch { }
     }
