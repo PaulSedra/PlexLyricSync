@@ -3,6 +3,7 @@
     x:Class="PlexLyricSync.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:PlexLyricSync"
     Title="PlexLyricSync">
 
 
@@ -14,7 +15,7 @@
 
         <Grid x:Name="DragRegion" Grid.Row="0" Background="Transparent"/>
 
-        <Grid x:Name="Root" Grid.Row="1" Padding="16 0 16 16">
+        <Grid x:Name="Root" x:FieldModifier="internal" Grid.Row="1" Padding="16 0 16 16">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
@@ -37,59 +38,11 @@
            />
             </StackPanel>
 
-            <!-- LyricLine -->
-            <StackPanel  Grid.Row="1" x:Name="LyricStack" VerticalAlignment="Center" Spacing="2">
-                <TextBlock x:Name="LyPrev3" FontSize="16" Foreground="White" Opacity="0.35" TextWrapping="WrapWholeWords" TextAlignment="Center"/>
-                <TextBlock x:Name="LyPrev2" FontSize="18" Foreground="White" Opacity="0.45" TextWrapping="WrapWholeWords" TextAlignment="Center"/>
-                <TextBlock x:Name="LyPrev1" FontSize="20" Foreground="White" Opacity="0.65" TextWrapping="WrapWholeWords" TextAlignment="Center"/>
-                <TextBlock x:Name="LyCurr0" FontSize="28" Foreground="White" TextWrapping="WrapWholeWords" TextAlignment="Center" FontWeight="SemiBold"/>
-                <TextBlock x:Name="LyNext1" FontSize="22" Foreground="White" Opacity="0.80" TextWrapping="WrapWholeWords" TextAlignment="Center"/>
-                <TextBlock x:Name="LyNext2" FontSize="18" Foreground="White" Opacity="0.55" TextWrapping="WrapWholeWords" TextAlignment="Center"/>
-                <TextBlock x:Name="LyNext3" FontSize="16" Foreground="White" Opacity="0.35" TextWrapping="WrapWholeWords" TextAlignment="Center"/>
-            </StackPanel>
+            <!-- Lyrics view -->
+            <local:LyricsView Grid.Row="1" x:Name="LyricsView"/>
 
             <!-- Controls/SongProgress/TimeLabel -->
-            <StackPanel Grid.Row="2" Spacing="6">
-                <StackPanel x:Name="Controls" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="12">
-                    <Button
-                        x:Name="PreviousButton"
-                        Click="PreviousButton_Click">
-                        <SymbolIcon x:Name="PreviousIcon" Symbol="Previous"/>
-                    </Button>
-                    <Button
-                        x:Name="PlayPauseButton"
-                        Click="PlayPauseButton_Click"
-                        HorizontalAlignment="Center">
-                        <SymbolIcon x:Name="PlayPauseIcon" Symbol="Play"/>
-                    </Button>
-                    <Button
-                         x:Name="NextButton"
-                         Click="NextButton_Click">
-                         <SymbolIcon x:Name="NextIcon" Symbol="Next"/>
-                    </Button>
-                </StackPanel>
-                <Border
-                    x:Name="SongProgress"
-                    Height="6"
-                    Background="#44FFFFFF"
-                    CornerRadius="3"
-                    PointerPressed="SongProgress_PointerPressed"
-                    PointerMoved="SongProgress_PointerMoved"
-                    PointerReleased="SongProgress_PointerReleased">
-                    <Border
-                        x:Name="SongProgressFill"
-                        Background="{ThemeResource SystemAccentColor}"
-                        HorizontalAlignment="Left"
-                        Width="0"/>
-                </Border>
-                <TextBlock
-                    x:Name="TimeLabel"
-                    Foreground="#E6FFFFFF"
-                    Opacity="0.9"
-                    FontSize="12"
-                    HorizontalAlignment="Right"
-                />
-            </StackPanel>
+            <local:PlayerControls x:Name="ControlPanel" Grid.Row="2" />
         </Grid>
     </Grid>
 
