@@ -31,18 +31,31 @@ public sealed partial class LyricsView : UserControl
         LyNext3.Tapped += async (_, __) => await SeekToRelativeAsync(+3);
     }
 
-    public async Task FetchLyricsAsync(string artist, string title, string key, CancellationToken ct)
+    public async Task FetchLyricsAsync(string artist, string album, string title, string key, CancellationToken ct)
     {
         _trackKey = key;
         try
         {
-            var res = await _lyrics.GetAsync(title, artist, ct);
+            var res = await _lyrics.GetAsync(title, artist, album, ct);
 
             if (res is null)
             {
                 SetNoLyrics("No lyrics found.");
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    if (key != _trackKey) return;
+                    LySource.Text = string.Empty;
+                });
                 return;
             }
+
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                if (key != _trackKey) return;
+                LySource.Text = res.Value.fromCache && !string.IsNullOrWhiteSpace(res.Value.path)
+                    ? $"Local: {res.Value.path}"
+                    : "Remote";
+            });
 
             if (!string.IsNullOrWhiteSpace(res.Value.syncedLrc))
             {
@@ -82,6 +95,7 @@ public sealed partial class LyricsView : UserControl
             _lrc = null;
             _hasSynced = false;
             LyCurr0.Text = msg;
+            LySource.Text = string.Empty;
         });
     }
 

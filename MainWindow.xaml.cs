@@ -22,7 +22,7 @@ public sealed partial class MainWindow : Window
     private CancellationTokenSource? _pollCts;
 
     // latest plex metadata
-    private string _artist = "", _title = "";
+    private string _artist = "", _album = "", _title = "";
     internal string _state = "";
     internal int _durationMs = 0;
     private int _viewOffsetMs = 0;
@@ -102,7 +102,7 @@ public sealed partial class MainWindow : Window
 
             if (np is null)
             {
-                _artist = _title = _state = "";
+                _artist = _album = _title = _state = "";
                 _durationMs = 0;
                 _viewOffsetMs = 0;
 
@@ -117,7 +117,7 @@ public sealed partial class MainWindow : Window
             _clientId = np.ClientId ?? _clientId;
 
             // change detection
-            bool trackChanged = np.Artist != _artist || np.Title != _title || np.DurationMs != _durationMs;
+            bool trackChanged = np.Artist != _artist || np.Album != _album || np.Title != _title || np.DurationMs != _durationMs;
             bool stateChanged = !np.State.Equals(_state, StringComparison.OrdinalIgnoreCase);
             bool viewOffsetChanged = np.ViewOffsetMs != _viewOffsetMs;
 
@@ -125,6 +125,7 @@ public sealed partial class MainWindow : Window
             {
                 // track
                 _artist = np.Artist;
+                _album = np.Album;
                 _title = np.Title;
                 _durationMs = np.DurationMs;
                 _state = np.State;
@@ -139,8 +140,8 @@ public sealed partial class MainWindow : Window
 
             if (trackChanged)
             {
-                var trackKey = $"{_artist}|{_title}|{_durationMs}";
-                await LyricsView.FetchLyricsAsync(_artist, _title, trackKey, ct).ConfigureAwait(false);
+                var trackKey = $"{_artist}|{_album}|{_title}|{_durationMs}";
+                await LyricsView.FetchLyricsAsync(_artist, _album, _title, trackKey, ct).ConfigureAwait(false);
             }
 
             // Update labels
