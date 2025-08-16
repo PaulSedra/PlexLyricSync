@@ -9,6 +9,7 @@ namespace PlexLyricSync;
 
 public record PlexNowPlayingResult(
     string Artist,
+    string Album,
     string Title,
     int ViewOffsetMs,
     int DurationMs,
@@ -63,6 +64,7 @@ public sealed class PlexApiClient : IDisposable
         var player = tr.Element("Player");
 
         string artist = tr.Attribute("grandparentTitle")?.Value ?? "";
+        string album = tr.Attribute("parentTitle")?.Value ?? "";
         string title = tr.Attribute("title")?.Value ?? "";
         int duration = int.TryParse(tr.Attribute("duration")?.Value, out var d) ? d : 0;
 
@@ -78,7 +80,7 @@ public sealed class PlexApiClient : IDisposable
         if (string.IsNullOrWhiteSpace(artist) && string.IsNullOrWhiteSpace(title))
             return null;
 
-        return new PlexNowPlayingResult(artist, title, offset, duration, state, clientId);
+        return new PlexNowPlayingResult(artist, album, title, offset, duration, state, clientId);
     }
 
     /// <summary>
