@@ -1,10 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.UI.Input;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
@@ -63,15 +61,13 @@ public sealed partial class LyricsView : UserControl
                     var idx = _localPath.IndexOf("lyrics", StringComparison.OrdinalIgnoreCase);
                     var disp = idx >= 0 ? _localPath[idx..].Replace('\\', '/') : _localPath;
                     LySource.Text = "Local";
-                    LySource.ToolTip = disp;
-                    LySource.Cursor = InputSystemCursor.Create(InputSystemCursorShape.Hand);
+                    ToolTipService.SetToolTip(LySource, disp);
                 }
                 else
                 {
                     _localPath = null;
                     LySource.Text = "Remote";
-                    LySource.ToolTip = null;
-                    LySource.Cursor = null;
+                    ToolTipService.SetToolTip(LySource, null);
                 }
             });
 
@@ -114,8 +110,7 @@ public sealed partial class LyricsView : UserControl
             _hasSynced = false;
             LyCurr0.Text = msg;
             LySource.Text = string.Empty;
-            LySource.ToolTip = null;
-            LySource.Cursor = null;
+            ToolTipService.SetToolTip(LySource, null);
             _localPath = null;
         });
     }
