@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
@@ -32,86 +33,123 @@ public sealed partial class LyricsView : UserControl
         LyNext2.Tapped += async (_, __) => await SeekToRelativeAsync(+2);
         LyNext3.Tapped += async (_, __) => await SeekToRelativeAsync(+3);
         LySource.Tapped += OnLySourceTapped;
+        LyUpdate.Click += OnLyUpdateClicked;
     }
 
-    public async Task FetchLyricsAsync(string artist, string album, string title, string key, CancellationToken ct)
+    /// <summary>
+    /// Gets local and remote lyrics. Prioritizes displaying local lyrics.
+    /// If there is a discrepancy, local lyrics are overwritten and the user is prompted to refresh UI lyrics.
+    /// </summary>
+    /// <param name="artist">track artist</param>
+    /// <param name="album">track album</param>
+    /// <param name="title">track title</param>
+    /// <param name="trackKey">track trackKey</param>
+    /// <param name="ct">cancellation token</param>
+    public async Task FetchLyricsAsync(string artist, string album, string title, string trackKey, CancellationToken ct)
     {
-        _trackKey = key;
+        _trackKey = trackKey;
+        LyUpdate.Visibility = Visibility.Collapsed;
+        LyricsClient.LyricsData? local = null;
+
         try
         {
-            var res = await _lyrics.GetAsync(title, artist, album, ct);
+            local = await _lyrics.GetLocalAsync(title, artist, album, ct);  // get local lyrics
+            if (local is not null) SetLyrics(trackKey, local, true);        // local lyrics found
+            else SetNoLyrics("Searching for lyrics...");                    // local lyrics not found
+        }
+        catch
+        {
+            if (_lrc is null) SetNoLyrics("An error occurred while attempting to grab lyrics locally.");
+        }
 
-            if (res is null)
+        try
+        {
+            var remote = await _lyrics.GetRemoteAsync(title, artist, album, ct);  // get remote lyrics
+            if (local is null)
             {
-                SetNoLyrics("No lyrics found.");
-                DispatcherQueue.TryEnqueue(() =>
-                {
-                    if (key != _trackKey) return;
-                    LySource.Text = string.Empty;
-                });
-                return;
+                if (remote is not null) SetLyrics(trackKey, remote, false);       // remote lyrics found
+                else SetNoLyrics("No lyrics found.");                             // no local or remote lyrics found
+
             }
-
-            DispatcherQueue.TryEnqueue(() =>
-            {
-                if (key != _trackKey) return;
-                if (res.Value.fromCache && !string.IsNullOrWhiteSpace(res.Value.path))
-                {
-                    _localPath = res.Value.path;
-                    var idx = _localPath.IndexOf("lyrics", StringComparison.OrdinalIgnoreCase);
-                    var disp = idx >= 0 ? _localPath[idx..].Replace('\\', '/') : _localPath;
-                    LySource.Text = "Local";
-                    ToolTipService.SetToolTip(LySource, disp);
-                }
-                else
-                {
-                    _localPath = null;
-                    LySource.Text = "Remote";
-                    ToolTipService.SetToolTip(LySource, null);
-                }
-            });
-
-            if (!string.IsNullOrWhiteSpace(res.Value.syncedLrc))
-            {
-                var parsed = LrcParser.Parse(res.Value.syncedLrc!);
-                DispatcherQueue.TryEnqueue(() =>
-                {
-                    if (key != _trackKey) return;
-                    _lrc = parsed;
-                    _hasSynced = true;
-                });
-            }
-            else if (!string.IsNullOrWhiteSpace(res.Value.plain))
+            else if (remote != local)
             {
                 DispatcherQueue.TryEnqueue(() =>
                 {
-                    if (key != _trackKey) return;
-                    _lrc = null;
-                    _hasSynced = false;
-                    LyCurr0.Text = res.Value.plain;
+                    if (trackKey != _trackKey) return;
+                    LyUpdate.Visibility = Visibility.Visible;
                 });
-            }
-            else
-            {
-                SetNoLyrics("No lyrics found.");
             }
         }
         catch
         {
-            SetNoLyrics("Unable to fetch lyrics.");
+            // Known errors:
+            // Exception thrown: 'System.Threading.Tasks.TaskCanceledException' in System.Private.CoreLib.dll
+            // This maybe happening because something goes wrong in _lyrics.GetRemoteAsync or the method is called twice?
+
+            if (_lrc is null) SetNoLyrics("An error occurred while searching for lyrics.");
         }
     }
 
-    private void SetNoLyrics(string msg)
+    /// <summary>
+    /// Updates UI lyrics.
+    /// </summary>
+    /// <param name="trackKey">track key</param>
+    /// <param name="lyrics">track lyrics</param>
+    /// <param name="local">true if lyrics are local</param>
+    private void SetLyrics(string trackKey, LyricsClient.LyricsData lyrics, bool local)
+    {
+        // updates lyrics source
+        DispatcherQueue.TryEnqueue(() =>
+        {
+            if (trackKey != _trackKey) return;
+            _localPath = lyrics.path;
+            var idx = _localPath!.IndexOf("lyrics", StringComparison.OrdinalIgnoreCase);
+            var disp = idx >= 0 ? _localPath[idx..].Replace('\\', '/') : _localPath;
+            LySource.Text = local? "Local" : "Remote";
+            ToolTipService.SetToolTip(LySource, local? disp : null);
+        });
+
+        // update synced lyrics
+        if (!string.IsNullOrWhiteSpace(lyrics.syncedLrc))
+        {
+            var parsed = LrcParser.Parse(lyrics.syncedLrc);
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                if (trackKey != _trackKey) return;
+                _lrc = parsed;
+                _hasSynced = true;
+            });
+        }
+
+        // update plain lyrics
+        else if (!string.IsNullOrWhiteSpace(lyrics.plain))
+        {
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                if (trackKey != _trackKey) return;
+                _lrc = null;
+                _hasSynced = false;
+                LyCurr0.Text = lyrics.plain;
+            });
+        }
+    }
+
+    /// <summary>
+    /// Updates UI lyrics when there are no lyrics.
+    /// Can optionally set a custom message to appear
+    /// </summary>
+    /// <param name="msg">custom message</param>
+    private void SetNoLyrics(string? msg)
     {
         DispatcherQueue.TryEnqueue(() =>
         {
             _lrc = null;
             _hasSynced = false;
-            LyCurr0.Text = msg;
+            LyCurr0.Text = msg ?? "No lyrics found.";
             LySource.Text = string.Empty;
             ToolTipService.SetToolTip(LySource, null);
             _localPath = null;
+            LyUpdate.Visibility = Visibility.Collapsed;
         });
     }
 
@@ -199,6 +237,27 @@ public sealed partial class LyricsView : UserControl
                 UseShellExecute = true
             };
             Process.Start(psi);
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// Refreshes UI lyrics with local lyrics.
+    /// </summary>
+    /// <param name="sender"></param>
+    /// <param name="e"></param>
+    private async void OnLyUpdateClicked(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_localPath)) return;
+        try
+        {
+            var lyrics = await File.ReadAllTextAsync(_localPath);
+            LyricsClient.LyricsData local = _localPath.EndsWith(".lrc", StringComparison.OrdinalIgnoreCase)
+                ? new LyricsClient.LyricsData(lyrics, null, _localPath)
+                : new LyricsClient.LyricsData(null, lyrics, _localPath);
+            SetLyrics(_trackKey, local, true);
+
+            LyUpdate.Visibility = Visibility.Collapsed;
         }
         catch { }
     }
