@@ -13,6 +13,9 @@ using Windows.Graphics;
 using Windows.System;
 using ColorThiefDotNet;
 using System.Drawing;
+using SDColor = System.Drawing.Color;
+using WinColor = Windows.UI.Color;
+using Windows.Foundation;
 
 namespace PlexLyricSync;
 
@@ -183,50 +186,50 @@ public sealed partial class MainWindow : Window
             using var ms = new MemoryStream(bytes);
             using var bmp = new Bitmap(ms);
             var colorThief = new ColorThief();
-            var palette = colorThief.GetPalette(bmp, 5);
+            var palette = colorThief.GetPalette(bmp, 6);
             if (palette is null || palette.Count == 0)
             {
                 return;
             }
 
-            // Prepare candidate colors, darkening overly bright ones
-            var candidates = new List<Color>(palette.Count);
+            // Collect up to four distinct, darkened colors
+            var colors = new List<SDColor>();
             foreach (var q in palette)
             {
-                candidates.Add(DarkenIfNeeded(q.Color));
+                var c = DarkenIfNeeded(q.Color);
+                bool similar = false;
+                foreach (var existing in colors)
+                {
+                    if (ColorDistance(existing, c) < 40)
+                    {
+                        similar = true;
+                        break;
+                    }
+                }
+                if (!similar)
+                {
+                    colors.Add(c);
+                }
+                if (colors.Count == 4) break;
             }
 
-            var first = candidates[0];
-            var second = first;
-            double maxDist = 0;
-            for (int i = 1; i < candidates.Count; i++)
+            if (colors.Count == 0)
             {
-                double dist = ColorDistance(first, candidates[i]);
-                if (dist > maxDist)
-                {
-                    maxDist = dist;
-                    second = candidates[i];
-                }
+                return;
+            }
+
+            while (colors.Count < 4)
+            {
+                colors.Add(colors[0]);
             }
 
             DispatcherQueue.TryEnqueue(() =>
             {
-                var brush = new LinearGradientBrush
-                {
-                    StartPoint = new(0.5, 0),
-                    EndPoint = new(0.5, 1)
-                };
-                brush.GradientStops.Add(new GradientStop
-                {
-                    Color = Windows.UI.Color.FromArgb(255, first.R, first.G, first.B),
-                    Offset = 0
-                });
-                brush.GradientStops.Add(new GradientStop
-                {
-                    Color = Windows.UI.Color.FromArgb(255, second.R, second.G, second.B),
-                    Offset = 1
-                });
-                BackgroundGrid.Background = brush;
+                GradientOverlay.Children.Clear();
+                AddCorner(colors[0], 0, 0);
+                AddCorner(colors[1], 1, 0);
+                AddCorner(colors[2], 0, 1);
+                AddCorner(colors[3], 1, 1);
             });
         }
         catch
@@ -283,7 +286,36 @@ public sealed partial class MainWindow : Window
         { }
     }
 
-    private static double ColorDistance(Color a, Color b)
+    private void AddCorner(SDColor c, double x, double y)
+    {
+        var brush = new RadialGradientBrush
+        {
+            Center = new Point(x, y),
+            GradientOrigin = new Point(x, y),
+            RadiusX = 1,
+            RadiusY = 1
+        };
+        brush.GradientStops.Add(new GradientStop
+        {
+            Color = WinColor.FromArgb(255, c.R, c.G, c.B),
+            Offset = 0
+        });
+        brush.GradientStops.Add(new GradientStop
+        {
+            Color = WinColor.FromArgb(0, c.R, c.G, c.B),
+            Offset = 1
+        });
+
+        var border = new Border
+        {
+            Background = brush,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            VerticalAlignment = VerticalAlignment.Stretch
+        };
+        GradientOverlay.Children.Add(border);
+    }
+
+    private static double ColorDistance(SDColor a, SDColor b)
     {
         int dr = a.R - b.R;
         int dg = a.G - b.G;
@@ -291,19 +323,19 @@ public sealed partial class MainWindow : Window
         return Math.Sqrt(dr * dr + dg * dg + db * db);
     }
 
-    private static Color DarkenIfNeeded(Color c)
+    private static SDColor DarkenIfNeeded(SDColor c)
     {
         if (GetBrightness(c) > 180)
         {
             byte r = (byte)(c.R * 0.6);
             byte g = (byte)(c.G * 0.6);
             byte b = (byte)(c.B * 0.6);
-            return Color.FromArgb(c.A, r, g, b);
+            return SDColor.FromArgb(c.A, r, g, b);
         }
         return c;
     }
 
-    private static double GetBrightness(Color c)
+    private static double GetBrightness(SDColor c)
     {
         return 0.299 * c.R + 0.587 * c.G + 0.114 * c.B;
     }

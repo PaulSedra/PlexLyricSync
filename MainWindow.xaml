@@ -13,6 +13,9 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
+        <!-- Radial gradient overlay spans the entire window -->
+        <Grid x:Name="GradientOverlay" Grid.RowSpan="2" IsHitTestVisible="False" />
+
         <Grid x:Name="DragRegion" Grid.Row="0" Background="Transparent"/>
 
         <Grid x:Name="Root" x:FieldModifier="internal" Grid.Row="1" Padding="16 0 16 16">
