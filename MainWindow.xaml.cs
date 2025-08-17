@@ -10,7 +10,7 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Windows.Graphics;
 using Windows.System;
-using ColorThiefDotNet;
+using ColorThief;
 using System.Drawing;
 
 namespace PlexLyricSync;
@@ -191,7 +191,7 @@ public sealed partial class MainWindow : Window
             var brush = new LinearGradientBrush { StartPoint = new(0, 0), EndPoint = new(1, 1) };
             for (int i = 0; i < palette.Count; i++)
             {
-                var c = palette[i].Color;
+                var c = palette[i];
                 double offset = palette.Count == 1 ? 0 : (double)i / (palette.Count - 1);
                 brush.GradientStops.Add(new GradientStop
                 {

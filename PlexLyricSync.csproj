@@ -39,7 +39,7 @@
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.4654" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.7.250606001" />
     <PackageReference Include="YamlDotNet" Version="16.3.0" />
-    <PackageReference Include="ColorThiefDotNet" Version="2.2.0" />
+    <PackageReference Include="ksemenenko.ColorThief" Version="1.1.1.4" />
     <PackageReference Include="System.Drawing.Common" Version="8.0.5" />
   </ItemGroup>
   <ItemGroup>
