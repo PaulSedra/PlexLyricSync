@@ -49,7 +49,7 @@ public sealed partial class MainWindow : Window
     {
         InitializeComponent();
 
-        AlbumArtImage.Loaded += (_, __) => InitializeAlbumArtBlur();
+        AlbumArtHost.Loaded += (_, __) => InitializeAlbumArtBlur();
 
         this.AppWindow.Resize(new SizeInt32(startWidth, startHeight));
         if (this.AppWindow.Presenter is OverlappedPresenter p)
@@ -98,7 +98,7 @@ public sealed partial class MainWindow : Window
 
     private void InitializeAlbumArtBlur()
     {
-        var compositor = ElementCompositionPreview.GetElementVisual(AlbumArtImage).Compositor;
+        var compositor = ElementCompositionPreview.GetElementVisual(AlbumArtHost).Compositor;
 
         var blur = new GaussianBlurEffect
         {
@@ -115,14 +115,14 @@ public sealed partial class MainWindow : Window
 
         _albumArtVisual = compositor.CreateSpriteVisual();
         _albumArtVisual.Brush = _albumArtBrush;
-        _albumArtVisual.Size = new Vector2((float)AlbumArtImage.ActualWidth, (float)AlbumArtImage.ActualHeight);
-        ElementCompositionPreview.SetElementChildVisual(AlbumArtImage, _albumArtVisual);
+        _albumArtVisual.Size = new Vector2((float)AlbumArtHost.ActualWidth, (float)AlbumArtHost.ActualHeight);
+        ElementCompositionPreview.SetElementChildVisual(AlbumArtHost, _albumArtVisual);
 
-        AlbumArtImage.SizeChanged += (_, __) =>
+        AlbumArtHost.SizeChanged += (_, __) =>
         {
             if (_albumArtVisual is not null)
             {
-                _albumArtVisual.Size = new Vector2((float)AlbumArtImage.ActualWidth, (float)AlbumArtImage.ActualHeight);
+                _albumArtVisual.Size = new Vector2((float)AlbumArtHost.ActualWidth, (float)AlbumArtHost.ActualHeight);
             }
         };
 
