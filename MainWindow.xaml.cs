@@ -192,20 +192,20 @@ public sealed partial class MainWindow : Window
                 return;
             }
 
-            var baseColors = new List<SDColor>();
+            var baseColors = new List<(SDColor Color, int Pop)>();
             foreach (var q in palette)
             {
-                baseColors.Add(DarkenIfNeeded(q.Color));
+                baseColors.Add((DarkenIfNeeded(q.Color), q.Population));
             }
 
-            List<SDColor> colors;
+            List<(SDColor Color, int Pop)> colors;
             if (baseColors.Count >= 4)
             {
                 colors = PickMostDissimilar(baseColors);
             }
             else
             {
-                colors = new List<SDColor>(baseColors);
+                colors = new List<(SDColor, int)>(baseColors);
                 while (colors.Count < 4 && colors.Count > 0)
                 {
                     colors.Add(colors[0]);
@@ -216,13 +216,15 @@ public sealed partial class MainWindow : Window
                 }
             }
 
+            int maxPop = colors.Max(c => c.Pop);
+
             DispatcherQueue.TryEnqueue(() =>
             {
                 GradientOverlay.Children.Clear();
-                AddCorner(colors[0], 0, 0);
-                AddCorner(colors[1], 1, 0);
-                AddCorner(colors[2], 0, 1);
-                AddCorner(colors[3], 1, 1);
+                AddCorner(colors[0].Color, 0, 0, ScaleRadius(colors[0].Pop, maxPop));
+                AddCorner(colors[1].Color, 1, 0, ScaleRadius(colors[1].Pop, maxPop));
+                AddCorner(colors[2].Color, 0, 1, ScaleRadius(colors[2].Pop, maxPop));
+                AddCorner(colors[3].Color, 1, 1, ScaleRadius(colors[3].Pop, maxPop));
             });
         }
         catch
@@ -279,14 +281,14 @@ public sealed partial class MainWindow : Window
         { }
     }
 
-    private void AddCorner(SDColor c, double x, double y)
+    private void AddCorner(SDColor c, double x, double y, double radius)
     {
         var brush = new RadialGradientBrush
         {
             Center = new Windows.Foundation.Point(x, y),
             GradientOrigin = new Windows.Foundation.Point(x, y),
-            RadiusX = 1,
-            RadiusY = 1
+            RadiusX = radius,
+            RadiusY = radius
         };
         brush.GradientStops.Add(new GradientStop
         {
@@ -316,9 +318,9 @@ public sealed partial class MainWindow : Window
         return Math.Sqrt(dr * dr + dg * dg + db * db);
     }
 
-    private static List<SDColor> PickMostDissimilar(List<SDColor> colors)
+    private static List<(SDColor Color, int Pop)> PickMostDissimilar(List<(SDColor Color, int Pop)> colors)
     {
-        List<SDColor> best = new();
+        List<(SDColor Color, int Pop)> best = new();
         double bestScore = double.NegativeInfinity;
         int n = colors.Count;
         for (int a = 0; a < n - 3; a++)
@@ -327,7 +329,7 @@ public sealed partial class MainWindow : Window
                     for (int d = c + 1; d < n; d++)
                     {
                         var set = new[] { colors[a], colors[b], colors[c], colors[d] };
-                        double score = TotalPairwiseDistance(set);
+                        double score = TotalPairwiseDistance(set.Select(x => x.Color).ToList());
                         if (score > bestScore)
                         {
                             bestScore = score;
@@ -356,6 +358,13 @@ public sealed partial class MainWindow : Window
             return SDColor.FromArgb(c.A, r, g, b);
         }
         return c;
+    }
+
+    private static double ScaleRadius(int pop, int maxPop)
+    {
+        if (maxPop <= 0) return 1;
+        double ratio = (double)pop / maxPop;
+        return 0.4 + 0.6 * ratio;
     }
 
     private static double GetBrightness(SDColor c)
