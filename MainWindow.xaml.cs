@@ -206,9 +206,9 @@ public sealed partial class MainWindow : Window
             {
                 BackgroundGrid.Background = new SolidColorBrush(WinColor.FromArgb(255, anchor.Color.R, anchor.Color.G, anchor.Color.B));
                 GradientOverlay.Children.Clear();
-                if (others.Count > 0) AddCorner(others[0].Color, 1, 0);
-                if (others.Count > 1) AddCorner(others[1].Color, 0, 1);
-                if (others.Count > 2) AddCorner(others[2].Color, 1, 1);
+                if (others.Count > 0) AddCorner(others[0].Color, 1, 0, RadiusFromPopulation(others[0].Pop, anchor.Pop));
+                if (others.Count > 1) AddCorner(others[1].Color, 0, 1, RadiusFromPopulation(others[1].Pop, anchor.Pop));
+                if (others.Count > 2) AddCorner(others[2].Color, 1, 1, RadiusFromPopulation(others[2].Pop, anchor.Pop));
             });
         }
         catch
@@ -265,9 +265,8 @@ public sealed partial class MainWindow : Window
         { }
     }
 
-    private void AddCorner(SDColor c, double x, double y)
+    private void AddCorner(SDColor c, double x, double y, double radius)
     {
-        const double radius = 1.5;
         var brush = new RadialGradientBrush
         {
             Center = new Windows.Foundation.Point(x, y),
@@ -293,6 +292,13 @@ public sealed partial class MainWindow : Window
             VerticalAlignment = VerticalAlignment.Stretch
         };
         GradientOverlay.Children.Add(border);
+    }
+
+    private static double RadiusFromPopulation(int pop, int maxPop)
+    {
+        if (maxPop <= 0) return 1.0;
+        double ratio = pop / (double)maxPop;
+        return 1.0 + ratio;
     }
 
     private static double ColorDistance(SDColor a, SDColor b)
