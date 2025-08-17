@@ -8,8 +8,8 @@
 
 
     <Grid>
-        <!-- Host for blurred album art background -->
-        <Grid x:Name="AlbumArtHost" />
+        <!-- Album art background -->
+        <Image x:Name="AlbumArtImage" Stretch="UniformToFill" />
 
         <Grid Background="#CC111111">
             <Grid.RowDefinitions>
