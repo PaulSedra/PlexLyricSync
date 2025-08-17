@@ -182,7 +182,7 @@ public sealed partial class MainWindow : Window
             using var ms = new MemoryStream(bytes);
             using var bmp = new Bitmap(ms);
             var colorThief = new ColorThief();
-            var palette = colorThief.GetPalette(bmp, 5);
+            var palette = colorThief.GetPalette(bmp, 2);
             if (palette is null || palette.Count == 0)
             {
                 return;
@@ -190,17 +190,23 @@ public sealed partial class MainWindow : Window
 
             DispatcherQueue.TryEnqueue(() =>
             {
-                var brush = new LinearGradientBrush { StartPoint = new(0, 0), EndPoint = new(1, 1) };
-                for (int i = 0; i < palette.Count; i++)
+                var first = palette[0].Color;
+                var second = palette.Count > 1 ? palette[1].Color : palette[0].Color;
+                var brush = new LinearGradientBrush
                 {
-                    var c = palette[i].Color;
-                    double offset = palette.Count == 1 ? 0 : (double)i / (palette.Count - 1);
-                    brush.GradientStops.Add(new GradientStop
-                    {
-                        Color = Windows.UI.Color.FromArgb(255, c.R, c.G, c.B),
-                        Offset = offset
-                    });
-                }
+                    StartPoint = new(0.5, 0),
+                    EndPoint = new(0.5, 1)
+                };
+                brush.GradientStops.Add(new GradientStop
+                {
+                    Color = Windows.UI.Color.FromArgb(255, first.R, first.G, first.B),
+                    Offset = 0
+                });
+                brush.GradientStops.Add(new GradientStop
+                {
+                    Color = Windows.UI.Color.FromArgb(255, second.R, second.G, second.B),
+                    Offset = 1
+                });
                 BackgroundGrid.Background = brush;
             });
         }
