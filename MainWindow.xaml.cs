@@ -4,6 +4,7 @@ using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -15,7 +16,6 @@ using ColorThiefDotNet;
 using System.Drawing;
 using SDColor = System.Drawing.Color;
 using WinColor = Windows.UI.Color;
-using Windows.Foundation;
 
 namespace PlexLyricSync;
 
@@ -186,41 +186,34 @@ public sealed partial class MainWindow : Window
             using var ms = new MemoryStream(bytes);
             using var bmp = new Bitmap(ms);
             var colorThief = new ColorThief();
-            var palette = colorThief.GetPalette(bmp, 6);
+            var palette = colorThief.GetPalette(bmp, 10, 10, true);
             if (palette is null || palette.Count == 0)
             {
                 return;
             }
 
-            // Collect up to four distinct, darkened colors
-            var colors = new List<SDColor>();
+            var baseColors = new List<SDColor>();
             foreach (var q in palette)
             {
-                var c = DarkenIfNeeded(q.Color);
-                bool similar = false;
-                foreach (var existing in colors)
-                {
-                    if (ColorDistance(existing, c) < 40)
-                    {
-                        similar = true;
-                        break;
-                    }
-                }
-                if (!similar)
-                {
-                    colors.Add(c);
-                }
-                if (colors.Count == 4) break;
+                baseColors.Add(DarkenIfNeeded(q.Color));
             }
 
-            if (colors.Count == 0)
+            List<SDColor> colors;
+            if (baseColors.Count >= 4)
             {
-                return;
+                colors = PickMostDissimilar(baseColors);
             }
-
-            while (colors.Count < 4)
+            else
             {
-                colors.Add(colors[0]);
+                colors = new List<SDColor>(baseColors);
+                while (colors.Count < 4 && colors.Count > 0)
+                {
+                    colors.Add(colors[0]);
+                }
+                if (colors.Count == 0)
+                {
+                    return;
+                }
             }
 
             DispatcherQueue.TryEnqueue(() =>
@@ -290,8 +283,8 @@ public sealed partial class MainWindow : Window
     {
         var brush = new RadialGradientBrush
         {
-            Center = new Point(x, y),
-            GradientOrigin = new Point(x, y),
+            Center = new Windows.Foundation.Point(x, y),
+            GradientOrigin = new Windows.Foundation.Point(x, y),
             RadiusX = 1,
             RadiusY = 1
         };
@@ -321,6 +314,36 @@ public sealed partial class MainWindow : Window
         int dg = a.G - b.G;
         int db = a.B - b.B;
         return Math.Sqrt(dr * dr + dg * dg + db * db);
+    }
+
+    private static List<SDColor> PickMostDissimilar(List<SDColor> colors)
+    {
+        List<SDColor> best = new();
+        double bestScore = double.NegativeInfinity;
+        int n = colors.Count;
+        for (int a = 0; a < n - 3; a++)
+            for (int b = a + 1; b < n - 2; b++)
+                for (int c = b + 1; c < n - 1; c++)
+                    for (int d = c + 1; d < n; d++)
+                    {
+                        var set = new[] { colors[a], colors[b], colors[c], colors[d] };
+                        double score = TotalPairwiseDistance(set);
+                        if (score > bestScore)
+                        {
+                            bestScore = score;
+                            best = set.ToList();
+                        }
+                    }
+        return best;
+    }
+
+    private static double TotalPairwiseDistance(IList<SDColor> cols)
+    {
+        double total = 0;
+        for (int i = 0; i < cols.Count; i++)
+            for (int j = i + 1; j < cols.Count; j++)
+                total += ColorDistance(cols[i], cols[j]);
+        return total;
     }
 
     private static SDColor DarkenIfNeeded(SDColor c)
