@@ -10,7 +10,7 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Windows.Graphics;
 using Windows.System;
-using ColorThief;
+using ColorThiefDotNet;
 using System.Drawing;
 
 namespace PlexLyricSync;
@@ -188,19 +188,21 @@ public sealed partial class MainWindow : Window
                 return;
             }
 
-            var brush = new LinearGradientBrush { StartPoint = new(0, 0), EndPoint = new(1, 1) };
-            for (int i = 0; i < palette.Count; i++)
+            DispatcherQueue.TryEnqueue(() =>
             {
-                var c = palette[i];
-                double offset = palette.Count == 1 ? 0 : (double)i / (palette.Count - 1);
-                brush.GradientStops.Add(new GradientStop
+                var brush = new LinearGradientBrush { StartPoint = new(0, 0), EndPoint = new(1, 1) };
+                for (int i = 0; i < palette.Count; i++)
                 {
-                    Color = Windows.UI.Color.FromArgb(255, c.R, c.G, c.B),
-                    Offset = offset
-                });
-            }
-
-            DispatcherQueue.TryEnqueue(() => BackgroundGrid.Background = brush);
+                    var c = palette[i].Color;
+                    double offset = palette.Count == 1 ? 0 : (double)i / (palette.Count - 1);
+                    brush.GradientStops.Add(new GradientStop
+                    {
+                        Color = Windows.UI.Color.FromArgb(255, c.R, c.G, c.B),
+                        Offset = offset
+                    });
+                }
+                BackgroundGrid.Background = brush;
+            });
         }
         catch
         {
