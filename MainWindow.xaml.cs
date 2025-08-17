@@ -125,6 +125,9 @@ public sealed partial class MainWindow : Window
                 _albumArtVisual.Size = new Vector2((float)AlbumArtImage.ActualWidth, (float)AlbumArtImage.ActualHeight);
             }
         };
+
+        // Apply any pending album art now that the blur pipeline exists
+        UpdateAlbumArt(_albumArtUrl);
     }
 
     private async Task RunPollLoopAsync(CancellationToken ct)
