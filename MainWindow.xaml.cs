@@ -1,12 +1,17 @@
 ﻿using System;
+using System.Net.Http;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Windows.Graphics;
 using Windows.System;
+using ColorThiefDotNet;
+using System.Drawing;
 
 namespace PlexLyricSync;
 
@@ -20,9 +25,10 @@ public sealed partial class MainWindow : Window
     internal PlexApiClient? _plex;
     internal string _clientId = "";       // Plex player's machineIdentifier
     private CancellationTokenSource? _pollCts;
+    private readonly HttpClient _artHttp = new();
 
     // latest plex metadata
-    private string _artist = "", _album = "", _title = "";
+    private string _artist = "", _album = "", _title = "", _artUrl = "";
     internal string _state = "";
     internal int _durationMs = 0;
     private int _viewOffsetMs = 0;
@@ -54,6 +60,7 @@ public sealed partial class MainWindow : Window
         var secrets = SecretsLoader.LoadSecrets();
         PlexBaseUrl = secrets.PlexBaseUrl;
         PlexToken = secrets.PlexToken;
+        _artHttp.DefaultRequestHeaders.TryAddWithoutValidation("X-Plex-Token", PlexToken);
 
         NowPlaying.Text = "Connecting to Plex";
 
@@ -63,6 +70,7 @@ public sealed partial class MainWindow : Window
         {
             _pollCts?.Cancel();
             _plex?.Dispose();
+            _artHttp.Dispose();
             _uiTimer.Stop();
         };
 
@@ -102,14 +110,18 @@ public sealed partial class MainWindow : Window
 
             if (np is null)
             {
-                _artist = _album = _title = _state = "";
+                _artist = _album = _title = _state = _artUrl = "";
                 _durationMs = 0;
                 _viewOffsetMs = 0;
 
                 _predictedViewOffsetMs = 0;
                 _predictedViewOffsetUtc = now;
 
-                DispatcherQueue.TryEnqueue(UpdateTrackInformation);
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    UpdateTrackInformation();
+                    BackgroundGrid.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(0xCC, 0x11, 0x11, 0x11));
+                });
                 return;
             }
 
@@ -117,7 +129,7 @@ public sealed partial class MainWindow : Window
             _clientId = np.ClientId ?? _clientId;
 
             // change detection
-            bool trackChanged = np.Artist != _artist || np.Album != _album || np.Title != _title || np.DurationMs != _durationMs;
+            bool trackChanged = np.Artist != _artist || np.Album != _album || np.Title != _title || np.DurationMs != _durationMs || np.ArtUrl != _artUrl;
             bool stateChanged = !np.State.Equals(_state, StringComparison.OrdinalIgnoreCase);
             bool viewOffsetChanged = np.ViewOffsetMs != _viewOffsetMs;
 
@@ -129,6 +141,7 @@ public sealed partial class MainWindow : Window
                 _title = np.Title;
                 _durationMs = np.DurationMs;
                 _state = np.State;
+                _artUrl = np.ArtUrl;
 
                 // viewOffset
                 _viewOffsetMs = np.ViewOffsetMs;
@@ -142,6 +155,7 @@ public sealed partial class MainWindow : Window
             {
                 var trackKey = $"{_artist}|{_album}|{_title}|{_durationMs}";
                 await LyricsView.FetchLyricsAsync(_artist, _album, _title, trackKey, ct).ConfigureAwait(false);
+                _ = UpdateBackgroundFromArtAsync(_artUrl, ct);
             }
 
             // Update labels
@@ -149,6 +163,48 @@ public sealed partial class MainWindow : Window
         }
         catch
         { }
+    }
+
+    private async Task UpdateBackgroundFromArtAsync(string artUrl, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(artUrl))
+        {
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                BackgroundGrid.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(0xCC, 0x11, 0x11, 0x11));
+            });
+            return;
+        }
+
+        try
+        {
+            var bytes = await _artHttp.GetByteArrayAsync(artUrl, ct).ConfigureAwait(false);
+            using var ms = new MemoryStream(bytes);
+            using var bmp = new Bitmap(ms);
+            var colorThief = new ColorThief();
+            var palette = colorThief.GetPalette(bmp, 5);
+            if (palette is null || palette.Count == 0)
+            {
+                return;
+            }
+
+            var brush = new LinearGradientBrush { StartPoint = new(0, 0), EndPoint = new(1, 1) };
+            for (int i = 0; i < palette.Count; i++)
+            {
+                var c = palette[i].Color;
+                double offset = palette.Count == 1 ? 0 : (double)i / (palette.Count - 1);
+                brush.GradientStops.Add(new GradientStop
+                {
+                    Color = Windows.UI.Color.FromArgb(255, c.R, c.G, c.B),
+                    Offset = offset
+                });
+            }
+
+            DispatcherQueue.TryEnqueue(() => BackgroundGrid.Background = brush);
+        }
+        catch
+        {
+        }
     }
 
     internal void UpdateProgressFromPrediction()

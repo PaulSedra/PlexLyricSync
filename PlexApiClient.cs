@@ -14,7 +14,8 @@ public record PlexNowPlayingResult(
     int ViewOffsetMs,
     int DurationMs,
     string State,
-    string ClientId
+    string ClientId,
+    string ArtUrl
 );
 
 public sealed class PlexApiClient : IDisposable
@@ -67,6 +68,8 @@ public sealed class PlexApiClient : IDisposable
         string album = tr.Attribute("parentTitle")?.Value ?? "";
         string title = tr.Attribute("title")?.Value ?? "";
         int duration = int.TryParse(tr.Attribute("duration")?.Value, out var d) ? d : 0;
+        string artPath = tr.Attribute("thumb")?.Value ?? tr.Attribute("art")?.Value ?? "";
+        string artUrl = string.IsNullOrWhiteSpace(artPath) ? "" : $"{_baseUrl}{artPath}";
 
         // Prefer <TranscodeSession time="..."> when present; fallback to viewOffset
         int offset = 0;
@@ -80,7 +83,7 @@ public sealed class PlexApiClient : IDisposable
         if (string.IsNullOrWhiteSpace(artist) && string.IsNullOrWhiteSpace(title))
             return null;
 
-        return new PlexNowPlayingResult(artist, album, title, offset, duration, state, clientId);
+        return new PlexNowPlayingResult(artist, album, title, offset, duration, state, clientId, artUrl);
     }
 
     /// <summary>
