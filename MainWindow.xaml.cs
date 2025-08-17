@@ -3,6 +3,7 @@ using System.Net.Http;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -182,16 +183,34 @@ public sealed partial class MainWindow : Window
             using var ms = new MemoryStream(bytes);
             using var bmp = new Bitmap(ms);
             var colorThief = new ColorThief();
-            var palette = colorThief.GetPalette(bmp, 2);
+            var palette = colorThief.GetPalette(bmp, 5);
             if (palette is null || palette.Count == 0)
             {
                 return;
             }
 
+            // Prepare candidate colors, darkening overly bright ones
+            var candidates = new List<Color>(palette.Count);
+            foreach (var q in palette)
+            {
+                candidates.Add(DarkenIfNeeded(q.Color));
+            }
+
+            var first = candidates[0];
+            var second = first;
+            double maxDist = 0;
+            for (int i = 1; i < candidates.Count; i++)
+            {
+                double dist = ColorDistance(first, candidates[i]);
+                if (dist > maxDist)
+                {
+                    maxDist = dist;
+                    second = candidates[i];
+                }
+            }
+
             DispatcherQueue.TryEnqueue(() =>
             {
-                var first = palette[0].Color;
-                var second = palette.Count > 1 ? palette[1].Color : palette[0].Color;
                 var brush = new LinearGradientBrush
                 {
                     StartPoint = new(0.5, 0),
@@ -262,5 +281,30 @@ public sealed partial class MainWindow : Window
         }
         catch
         { }
+    }
+
+    private static double ColorDistance(Color a, Color b)
+    {
+        int dr = a.R - b.R;
+        int dg = a.G - b.G;
+        int db = a.B - b.B;
+        return Math.Sqrt(dr * dr + dg * dg + db * db);
+    }
+
+    private static Color DarkenIfNeeded(Color c)
+    {
+        if (GetBrightness(c) > 180)
+        {
+            byte r = (byte)(c.R * 0.6);
+            byte g = (byte)(c.G * 0.6);
+            byte b = (byte)(c.B * 0.6);
+            return Color.FromArgb(c.A, r, g, b);
+        }
+        return c;
+    }
+
+    private static double GetBrightness(Color c)
+    {
+        return 0.299 * c.R + 0.587 * c.G + 0.114 * c.B;
     }
 }
