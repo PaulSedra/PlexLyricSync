@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
@@ -32,73 +33,114 @@ public sealed partial class LyricsView : UserControl
         LyNext2.Tapped += async (_, __) => await SeekToRelativeAsync(+2);
         LyNext3.Tapped += async (_, __) => await SeekToRelativeAsync(+3);
         LySource.Tapped += OnLySourceTapped;
+        LyUpdate.Click += OnLyUpdateClicked;
     }
 
     public async Task FetchLyricsAsync(string artist, string album, string title, string key, CancellationToken ct)
     {
         _trackKey = key;
+        LyUpdate.Visibility = Visibility.Collapsed;
+
         try
         {
-            var res = await _lyrics.GetAsync(title, artist, album, ct);
-
-            if (res is null)
+            var local = await _lyrics.GetLocalAsync(title, artist, album, ct);
+            string? localText = null;
+            if (local is not null)
             {
-                SetNoLyrics("No lyrics found.");
+                localText = local.Value.syncedLrc ?? local.Value.plain;
                 DispatcherQueue.TryEnqueue(() =>
                 {
                     if (key != _trackKey) return;
-                    LySource.Text = string.Empty;
-                });
-                return;
-            }
-
-            DispatcherQueue.TryEnqueue(() =>
-            {
-                if (key != _trackKey) return;
-                if (res.Value.fromCache && !string.IsNullOrWhiteSpace(res.Value.path))
-                {
-                    _localPath = res.Value.path;
-                    var idx = _localPath.IndexOf("lyrics", StringComparison.OrdinalIgnoreCase);
+                    _localPath = local.Value.path;
+                    var idx = _localPath!.IndexOf("lyrics", StringComparison.OrdinalIgnoreCase);
                     var disp = idx >= 0 ? _localPath[idx..].Replace('\\', '/') : _localPath;
                     LySource.Text = "Local";
                     ToolTipService.SetToolTip(LySource, disp);
-                }
-                else
-                {
-                    _localPath = null;
-                    LySource.Text = "Remote";
-                    ToolTipService.SetToolTip(LySource, null);
-                }
-            });
+                });
 
-            if (!string.IsNullOrWhiteSpace(res.Value.syncedLrc))
-            {
-                var parsed = LrcParser.Parse(res.Value.syncedLrc!);
-                DispatcherQueue.TryEnqueue(() =>
+                if (!string.IsNullOrWhiteSpace(local.Value.syncedLrc))
                 {
-                    if (key != _trackKey) return;
-                    _lrc = parsed;
-                    _hasSynced = true;
-                });
-            }
-            else if (!string.IsNullOrWhiteSpace(res.Value.plain))
-            {
-                DispatcherQueue.TryEnqueue(() =>
+                    var parsed = LrcParser.Parse(local.Value.syncedLrc);
+                    DispatcherQueue.TryEnqueue(() =>
+                    {
+                        if (key != _trackKey) return;
+                        _lrc = parsed;
+                        _hasSynced = true;
+                    });
+                }
+                else if (!string.IsNullOrWhiteSpace(local.Value.plain))
                 {
-                    if (key != _trackKey) return;
-                    _lrc = null;
-                    _hasSynced = false;
-                    LyCurr0.Text = res.Value.plain;
-                });
+                    DispatcherQueue.TryEnqueue(() =>
+                    {
+                        if (key != _trackKey) return;
+                        _lrc = null;
+                        _hasSynced = false;
+                        LyCurr0.Text = local.Value.plain;
+                    });
+                }
             }
             else
+            {
+                SetNoLyrics("No lyrics found.");
+            }
+
+            var remote = await _lyrics.GetRemoteAsync(title, artist, album, ct);
+            if (!string.IsNullOrWhiteSpace(remote.syncedLrc) || !string.IsNullOrWhiteSpace(remote.plain))
+            {
+                var remoteText = remote.syncedLrc ?? remote.plain;
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    _localPath = remote.path;
+                });
+
+                if (local is null)
+                {
+                    DispatcherQueue.TryEnqueue(() =>
+                    {
+                        if (key != _trackKey) return;
+                        LySource.Text = "Remote";
+                        ToolTipService.SetToolTip(LySource, null);
+                    });
+
+                    if (!string.IsNullOrWhiteSpace(remote.syncedLrc))
+                    {
+                        var parsed = LrcParser.Parse(remote.syncedLrc);
+                        DispatcherQueue.TryEnqueue(() =>
+                        {
+                            if (key != _trackKey) return;
+                            _lrc = parsed;
+                            _hasSynced = true;
+                        });
+                    }
+                    else if (!string.IsNullOrWhiteSpace(remote.plain))
+                    {
+                        DispatcherQueue.TryEnqueue(() =>
+                        {
+                            if (key != _trackKey) return;
+                            _lrc = null;
+                            _hasSynced = false;
+                            LyCurr0.Text = remote.plain;
+                        });
+                    }
+                }
+                else if (remoteText != localText)
+                {
+                    DispatcherQueue.TryEnqueue(() =>
+                    {
+                        if (key != _trackKey) return;
+                        LyUpdate.Visibility = Visibility.Visible;
+                    });
+                }
+            }
+            else if (local is null)
             {
                 SetNoLyrics("No lyrics found.");
             }
         }
         catch
         {
-            SetNoLyrics("Unable to fetch lyrics.");
+            if (_lrc is null)
+                SetNoLyrics("Unable to fetch lyrics.");
         }
     }
 
@@ -112,6 +154,7 @@ public sealed partial class LyricsView : UserControl
             LySource.Text = string.Empty;
             ToolTipService.SetToolTip(LySource, null);
             _localPath = null;
+            LyUpdate.Visibility = Visibility.Collapsed;
         });
     }
 
@@ -199,6 +242,33 @@ public sealed partial class LyricsView : UserControl
                 UseShellExecute = true
             };
             Process.Start(psi);
+        }
+        catch { }
+    }
+
+    private async void OnLyUpdateClicked(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_localPath)) return;
+        try
+        {
+            var text = await File.ReadAllTextAsync(_localPath);
+            if (_localPath.EndsWith(".lrc", StringComparison.OrdinalIgnoreCase))
+            {
+                var parsed = LrcParser.Parse(text);
+                _lrc = parsed;
+                _hasSynced = true;
+            }
+            else
+            {
+                _lrc = null;
+                _hasSynced = false;
+                LyCurr0.Text = text;
+            }
+            LyUpdate.Visibility = Visibility.Collapsed;
+            var idx = _localPath.IndexOf("lyrics", StringComparison.OrdinalIgnoreCase);
+            var disp = idx >= 0 ? _localPath[idx..].Replace('\\', '/') : _localPath;
+            LySource.Text = "Local";
+            ToolTipService.SetToolTip(LySource, disp);
         }
         catch { }
     }

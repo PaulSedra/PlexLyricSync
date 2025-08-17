@@ -1,10 +1,9 @@
-﻿using System;
+using System;
+using System.IO;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using System.IO;
-using Windows.Storage;
 
 namespace PlexLyricSync;
 
@@ -12,60 +11,57 @@ public sealed class LyricsClient : IDisposable
 {
     private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(3) };
 
-    /// <summary>
-    /// Grabs lrc file locally or from lrclib.net.
-    /// </summary>
-    /// <param name="title">track title</param>
-    /// <param name="artist">track artist</param>
-    /// <param name="album">track album</param>
-    /// <param name="ct">cancellation token</param>
-    /// <returns>
-    ///     SyncedLrc string (optional): synced lyrics if available<br/>
-    ///     plain string (optional): plain lyrics if available<br/>
-    ///     path string (optional): path to lrc file if local<br/>
-    ///     fromCahce bool: whether lrc file is local or remote
-    /// </returns>
-    public async Task<(string? syncedLrc, string? plain, string? path, bool fromCache)?> GetAsync(string title, string artist, string album, CancellationToken ct)
+    private static string Sanitize(string s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return "Unknown";
+        foreach (var c in Path.GetInvalidFileNameChars())
+            s = s.Replace(c, '_');
+        return s;
+    }
+
+    private static string GetLyricsDir(string artist, string album)
+    {
+        var music = Environment.GetFolderPath(Environment.SpecialFolder.MyMusic);
+        var dir = Path.Combine(music, "PlexLyricSync", "lyrics", Sanitize(artist), Sanitize(album));
+        Directory.CreateDirectory(dir);
+        return dir;
+    }
+
+    public async Task<(string? syncedLrc, string? plain, string? path)?> GetLocalAsync(string title, string artist, string album, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(title) && string.IsNullOrWhiteSpace(artist)) return null;
 
-        static string Sanitize(strsing s)
-        {
-            if (string.IsNullOrWhiteSpace(s)) return "Unknown";
-            foreach (var c in Path.GetInvalidFileNameChars())
-                s = s.Replace(c, '_');
-            return s;
-        }
+        var dir = GetLyricsDir(artist, album);
+        var lrcPath = Path.Combine(dir, Sanitize(title) + ".lrc");
+        var txtPath = Path.Combine(dir, Sanitize(title) + ".txt");
 
-        // file path
-        var localDir = ApplicationData.Current.LocalFolder.Path;
-        var lyricsDir = Path.Combine(localDir, "lyrics", Sanitize(artist), Sanitize(album));
-        Directory.CreateDirectory(lyricsDir);
-
-        var lrcPath = Path.Combine(lyricsDir, Sanitize(title) + ".lrc");
-        var txtPath = Path.Combine(lyricsDir, Sanitize(title) + ".txt");
-
-        // check if file exists
         if (File.Exists(lrcPath))
         {
             var lrc = await File.ReadAllTextAsync(lrcPath, ct);
-            return (lrc, null, lrcPath, true);
+            return (lrc, null, lrcPath);
         }
         if (File.Exists(txtPath))
         {
-            var plainCached = await File.ReadAllTextAsync(txtPath, ct);
-            return (null, plainCached, txtPath, true);
+            var plain = await File.ReadAllTextAsync(txtPath, ct);
+            return (null, plain, txtPath);
         }
 
-        // if file not found grab one from lrclib.net
+        return null;
+    }
+
+    public async Task<(string? syncedLrc, string? plain, string? path)> GetRemoteAsync(string title, string artist, string album, CancellationToken ct)
+    {
+        var dir = GetLyricsDir(artist, album);
+        var lrcPath = Path.Combine(dir, Sanitize(title) + ".lrc");
+        var txtPath = Path.Combine(dir, Sanitize(title) + ".txt");
+
         var url = $"https://lrclib.net/api/get?track_name={Uri.EscapeDataString(title)}&artist_name={Uri.EscapeDataString(artist)}";
         var resp = await _http.GetAsync(url, ct);
-        if (!resp.IsSuccessStatusCode) return null;
+        if (!resp.IsSuccessStatusCode) return (null, null, null);
 
         var doc = await resp.Content.ReadFromJsonAsync<LrcDoc>(cancellationToken: ct);
-        if (doc is null) return null;
+        if (doc is null) return (null, null, null);
 
-        // write file locally
         string? path = null;
         if (!string.IsNullOrWhiteSpace(doc.syncedLyrics))
         {
@@ -78,15 +74,15 @@ public sealed class LyricsClient : IDisposable
             path = txtPath;
         }
 
-        return (doc.syncedLyrics, doc.plainLyrics, path, false);
+        return (doc.syncedLyrics, doc.plainLyrics, path);
     }
 
     public void Dispose() => _http.Dispose();
 }
 
-// JSON shape from LRCLIB
 sealed class LrcDoc
 {
     public string? syncedLyrics { get; set; }
     public string? plainLyrics { get; set; }
 }
+
