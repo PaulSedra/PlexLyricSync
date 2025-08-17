@@ -8,11 +8,7 @@
 
 
     <Grid>
-        <Image x:Name="AlbumArtImage" Stretch="UniformToFill">
-            <Image.Effect>
-                <BlurEffect Radius="80"/>
-            </Image.Effect>
-        </Image>
+        <Image x:Name="AlbumArtImage" Stretch="UniformToFill" />
 
         <Grid Background="#CC111111">
             <Grid.RowDefinitions>

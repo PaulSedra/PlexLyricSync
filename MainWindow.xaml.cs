@@ -5,7 +5,10 @@ using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
-using Microsoft.UI.Xaml.Media.Imaging;
+using Microsoft.UI.Xaml.Hosting;
+using Microsoft.UI.Composition;
+using Microsoft.Graphics.Canvas.Effects;
+using System.Numerics;
 using Windows.Graphics;
 using Windows.System;
 
@@ -21,6 +24,12 @@ public sealed partial class MainWindow : Window
     internal PlexApiClient? _plex;
     internal string _clientId = "";       // Plex player's machineIdentifier
     private CancellationTokenSource? _pollCts;
+
+    // composition for blurred album art
+    private CompositionEffectBrush? _albumArtBrush;
+    private CompositionSurfaceBrush? _albumArtSurfaceBrush;
+    private LoadedImageSurface? _albumArtSurface;
+    private SpriteVisual? _albumArtVisual;
 
     // latest plex metadata
     private string _artist = "", _album = "", _title = "";
@@ -39,6 +48,8 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+
+        AlbumArtImage.Loaded += (_, __) => InitializeAlbumArtBlur();
 
         this.AppWindow.Resize(new SizeInt32(startWidth, startHeight));
         if (this.AppWindow.Presenter is OverlappedPresenter p)
@@ -83,6 +94,37 @@ public sealed partial class MainWindow : Window
         _pollCts = new CancellationTokenSource();
         await PollPlexOnceAsync(_pollCts.Token);
         _ = RunPollLoopAsync(_pollCts.Token);
+    }
+
+    private void InitializeAlbumArtBlur()
+    {
+        var compositor = ElementCompositionPreview.GetElementVisual(AlbumArtImage).Compositor;
+
+        var blur = new GaussianBlurEffect
+        {
+            Name = "blur",
+            BlurAmount = 80f,
+            BorderMode = EffectBorderMode.Hard,
+            Source = new CompositionEffectSourceParameter("source")
+        };
+
+        var effectFactory = compositor.CreateEffectFactory(blur);
+        _albumArtBrush = effectFactory.CreateBrush();
+        _albumArtSurfaceBrush = compositor.CreateSurfaceBrush();
+        _albumArtBrush.SetSourceParameter("source", _albumArtSurfaceBrush);
+
+        _albumArtVisual = compositor.CreateSpriteVisual();
+        _albumArtVisual.Brush = _albumArtBrush;
+        _albumArtVisual.Size = new Vector2((float)AlbumArtImage.ActualWidth, (float)AlbumArtImage.ActualHeight);
+        ElementCompositionPreview.SetElementChildVisual(AlbumArtImage, _albumArtVisual);
+
+        AlbumArtImage.SizeChanged += (_, __) =>
+        {
+            if (_albumArtVisual is not null)
+            {
+                _albumArtVisual.Size = new Vector2((float)AlbumArtImage.ActualWidth, (float)AlbumArtImage.ActualHeight);
+            }
+        };
     }
 
     private async Task RunPollLoopAsync(CancellationToken ct)
@@ -189,17 +231,27 @@ public sealed partial class MainWindow : Window
 
     private void UpdateAlbumArt(string url)
     {
+        if (_albumArtSurfaceBrush is null)
+            return;
+
+        _albumArtSurface?.Dispose();
+        _albumArtSurface = null;
+
         if (string.IsNullOrWhiteSpace(url))
         {
-            AlbumArtImage.Source = null;
+            _albumArtSurfaceBrush.Surface = null;
             return;
         }
 
         try
         {
-            AlbumArtImage.Source = new BitmapImage(new Uri(url));
+            _albumArtSurface = LoadedImageSurface.StartLoadFromUri(new Uri(url));
+            _albumArtSurfaceBrush.Surface = _albumArtSurface;
+            _albumArtSurfaceBrush.Stretch = CompositionStretch.UniformToFill;
         }
-        catch { }
+        catch
+        {
+        }
     }
     private async Task SeekToMsAsync(int targetMs)
     {
