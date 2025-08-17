@@ -198,33 +198,17 @@ public sealed partial class MainWindow : Window
                 baseColors.Add((DarkenIfNeeded(q.Color), q.Population));
             }
 
-            List<(SDColor Color, int Pop)> colors;
-            if (baseColors.Count >= 4)
-            {
-                colors = PickMostDissimilar(baseColors);
-            }
-            else
-            {
-                colors = new List<(SDColor, int)>(baseColors);
-                while (colors.Count < 4 && colors.Count > 0)
-                {
-                    colors.Add(colors[0]);
-                }
-                if (colors.Count == 0)
-                {
-                    return;
-                }
-            }
-
-            int maxPop = colors.Max(c => c.Pop);
+            var ordered = baseColors.OrderByDescending(c => c.Pop).ToList();
+            var anchor = ordered[0];
+            var others = PickWithAnchor(ordered.Skip(1).ToList(), anchor);
 
             DispatcherQueue.TryEnqueue(() =>
             {
+                BackgroundGrid.Background = new SolidColorBrush(WinColor.FromArgb(255, anchor.Color.R, anchor.Color.G, anchor.Color.B));
                 GradientOverlay.Children.Clear();
-                AddCorner(colors[0].Color, 0, 0, ScaleRadius(colors[0].Pop, maxPop));
-                AddCorner(colors[1].Color, 1, 0, ScaleRadius(colors[1].Pop, maxPop));
-                AddCorner(colors[2].Color, 0, 1, ScaleRadius(colors[2].Pop, maxPop));
-                AddCorner(colors[3].Color, 1, 1, ScaleRadius(colors[3].Pop, maxPop));
+                if (others.Count > 0) AddCorner(others[0].Color, 1, 0);
+                if (others.Count > 1) AddCorner(others[1].Color, 0, 1);
+                if (others.Count > 2) AddCorner(others[2].Color, 1, 1);
             });
         }
         catch
@@ -281,8 +265,9 @@ public sealed partial class MainWindow : Window
         { }
     }
 
-    private void AddCorner(SDColor c, double x, double y, double radius)
+    private void AddCorner(SDColor c, double x, double y)
     {
+        const double radius = 1.5;
         var brush = new RadialGradientBrush
         {
             Center = new Windows.Foundation.Point(x, y),
@@ -318,24 +303,27 @@ public sealed partial class MainWindow : Window
         return Math.Sqrt(dr * dr + dg * dg + db * db);
     }
 
-    private static List<(SDColor Color, int Pop)> PickMostDissimilar(List<(SDColor Color, int Pop)> colors)
+    private static List<(SDColor Color, int Pop)> PickWithAnchor(List<(SDColor Color, int Pop)> colors, (SDColor Color, int Pop) anchor)
     {
+        if (colors.Count <= 3)
+            return colors.Take(3).ToList();
+
         List<(SDColor Color, int Pop)> best = new();
         double bestScore = double.NegativeInfinity;
         int n = colors.Count;
-        for (int a = 0; a < n - 3; a++)
-            for (int b = a + 1; b < n - 2; b++)
-                for (int c = b + 1; c < n - 1; c++)
-                    for (int d = c + 1; d < n; d++)
+        for (int a = 0; a < n - 2; a++)
+            for (int b = a + 1; b < n - 1; b++)
+                for (int c = b + 1; c < n; c++)
+                {
+                    var set = new[] { anchor, colors[a], colors[b], colors[c] };
+                    double score = TotalPairwiseDistance(set.Select(x => x.Color).ToList());
+                    if (score > bestScore)
                     {
-                        var set = new[] { colors[a], colors[b], colors[c], colors[d] };
-                        double score = TotalPairwiseDistance(set.Select(x => x.Color).ToList());
-                        if (score > bestScore)
-                        {
-                            bestScore = score;
-                            best = set.ToList();
-                        }
+                        bestScore = score;
+                        best = new List<(SDColor Color, int Pop)> { colors[a], colors[b], colors[c] };
                     }
+                }
+
         return best;
     }
 
@@ -358,13 +346,6 @@ public sealed partial class MainWindow : Window
             return SDColor.FromArgb(c.A, r, g, b);
         }
         return c;
-    }
-
-    private static double ScaleRadius(int pop, int maxPop)
-    {
-        if (maxPop <= 0) return 1;
-        double ratio = (double)pop / maxPop;
-        return 0.4 + 0.6 * ratio;
     }
 
     private static double GetBrightness(SDColor c)
