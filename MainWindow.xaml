@@ -43,7 +43,7 @@
 
                 <!-- Lyrics and controls share the same row so lyrics stay centered -->
                 <Grid Grid.Row="1">
-                    <local:LyricsView x:Name="LyricsView" VerticalAlignment="Center"/>
+                    <local:LyricsView x:Name="LyricsView" VerticalAlignment="Stretch" HorizontalAlignment="Stretch"/>
                     <local:PlayerControls x:Name="ControlPanel" VerticalAlignment="Bottom"/>
                 </Grid>
             </Grid>

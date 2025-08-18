@@ -187,7 +187,7 @@ public sealed partial class PlayerControls : UserControl
             ? 0
             : SongProgress.ActualWidth * Math.Clamp(predictedViewOffsetMs / durationMs, 0, 1);
         TimeLabel.Text = $"{FormatTime(predictedViewOffsetMs)} / {FormatTime(durationMs)}";
-        PlayPauseIcon.Symbol = state.Equals("playing", StringComparison.OrdinalIgnoreCase) ? Symbol.Pause : Symbol.Play;
+        PlayPauseIcon.Glyph = state.Equals("playing", StringComparison.OrdinalIgnoreCase) ? "\uE769" : "\uE768";
     }
 
     private static string FormatTime(double ms)

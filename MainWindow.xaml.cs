@@ -7,12 +7,13 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media.Imaging;
+using Windows.Graphics;
 
 namespace PlexLyricSync;
 
 public sealed partial class MainWindow : Window
 {
-    private const int startWidth = 480, startHeight = 720;
+    private const int startWidth = 600, startHeight = 600;
 
     private string PlexBaseUrl;
     private string PlexToken;
