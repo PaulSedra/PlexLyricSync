@@ -4,15 +4,16 @@ using System.Threading.Tasks;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.Graphics;
-using Windows.System;
 
 namespace PlexLyricSync;
 
 public sealed partial class MainWindow : Window
 {
-    private const int startWidth = 480, startHeight = 720;
+    private const int startWidth = 600, startHeight = 600;
 
     private string PlexBaseUrl;
     private string PlexToken;
@@ -23,6 +24,7 @@ public sealed partial class MainWindow : Window
 
     // latest plex metadata
     private string _artist = "", _album = "", _title = "";
+    private string _albumArtUrl = "";
     internal string _state = "";
     internal int _durationMs = 0;
     private int _viewOffsetMs = 0;
@@ -105,11 +107,13 @@ public sealed partial class MainWindow : Window
                 _artist = _album = _title = _state = "";
                 _durationMs = 0;
                 _viewOffsetMs = 0;
+                _albumArtUrl = "";
 
                 _predictedViewOffsetMs = 0;
                 _predictedViewOffsetUtc = now;
 
                 DispatcherQueue.TryEnqueue(UpdateTrackInformation);
+                DispatcherQueue.TryEnqueue(() => UpdateAlbumArt(""));
                 return;
             }
 
@@ -117,7 +121,7 @@ public sealed partial class MainWindow : Window
             _clientId = np.ClientId ?? _clientId;
 
             // change detection
-            bool trackChanged = np.Artist != _artist || np.Album != _album || np.Title != _title || np.DurationMs != _durationMs;
+            bool trackChanged = np.Artist != _artist || np.Album != _album || np.Title != _title || np.DurationMs != _durationMs || np.AlbumArtUrl != _albumArtUrl;
             bool stateChanged = !np.State.Equals(_state, StringComparison.OrdinalIgnoreCase);
             bool viewOffsetChanged = np.ViewOffsetMs != _viewOffsetMs;
 
@@ -129,6 +133,7 @@ public sealed partial class MainWindow : Window
                 _title = np.Title;
                 _durationMs = np.DurationMs;
                 _state = np.State;
+                _albumArtUrl = np.AlbumArtUrl;
 
                 // viewOffset
                 _viewOffsetMs = np.ViewOffsetMs;
@@ -142,6 +147,7 @@ public sealed partial class MainWindow : Window
             {
                 var trackKey = $"{_artist}|{_album}|{_title}|{_durationMs}";
                 await LyricsView.FetchLyricsAsync(_artist, _album, _title, trackKey, ct).ConfigureAwait(false);
+                DispatcherQueue.TryEnqueue(() => UpdateAlbumArt(_albumArtUrl));
             }
 
             // Update labels
@@ -180,6 +186,23 @@ public sealed partial class MainWindow : Window
         NowPlaying.Text = !string.IsNullOrWhiteSpace(_title) ? _title : "Peace and quiet";
         ControlPanel.UpdateTrackInformation(_predictedViewOffsetMs, _durationMs, _state);
     }
+
+    private void UpdateAlbumArt(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            AlbumArtImage.Source = null;
+            return;
+        }
+
+        try
+        {
+            AlbumArtImage.Source = new BitmapImage(new Uri(url));
+        }
+        catch
+        {
+        }
+    }
     private async Task SeekToMsAsync(int targetMs)
     {
         try
@@ -198,5 +221,15 @@ public sealed partial class MainWindow : Window
         }
         catch
         { }
+    }
+
+    private void Window_PointerEntered(object sender, PointerRoutedEventArgs e)
+    {
+        ControlPanel.ShowControls();
+    }
+
+    private void Window_PointerExited(object sender, PointerRoutedEventArgs e)
+    {
+        ControlPanel.HideControls();
     }
 }

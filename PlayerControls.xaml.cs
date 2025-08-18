@@ -4,6 +4,8 @@ using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Animation;
 
 namespace PlexLyricSync;
 
@@ -13,10 +15,18 @@ public sealed partial class PlayerControls : UserControl
     public LyricsView? LyricsView { get; set; }
 
     private bool _isSeeking = false;     // true while user is dragging the progress bar
+    private double _controlsHeight;
 
     public PlayerControls()
     {
         this.InitializeComponent();
+
+        ControlsContainer.Loaded += (_, __) =>
+        {
+            _controlsHeight = ControlsContainer.ActualHeight;
+            ControlsTranslate.Y = _controlsHeight;
+            ControlsContainer.Visibility = Visibility.Collapsed;
+        };
     }
 
     /// <summary>
@@ -177,12 +187,44 @@ public sealed partial class PlayerControls : UserControl
             ? 0
             : SongProgress.ActualWidth * Math.Clamp(predictedViewOffsetMs / durationMs, 0, 1);
         TimeLabel.Text = $"{FormatTime(predictedViewOffsetMs)} / {FormatTime(durationMs)}";
-        PlayPauseIcon.Symbol = state.Equals("playing", StringComparison.OrdinalIgnoreCase) ? Symbol.Pause : Symbol.Play;
+        PlayPauseIcon.Glyph = state.Equals("playing", StringComparison.OrdinalIgnoreCase) ? "\uE103" : "\uE102";
     }
 
     private static string FormatTime(double ms)
     {
         var ts = TimeSpan.FromMilliseconds(ms);
         return $"{(int)ts.TotalMinutes:D2}:{ts.Seconds:D2}";
+    }
+
+    public void ShowControls()
+    {
+        ControlsContainer.Visibility = Visibility.Visible;
+        var sb = new Storyboard();
+        var anim = new DoubleAnimation
+        {
+            To = 0,
+            Duration = TimeSpan.FromMilliseconds(350),
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+        Storyboard.SetTarget(anim, ControlsTranslate);
+        Storyboard.SetTargetProperty(anim, "Y");
+        sb.Children.Add(anim);
+        sb.Begin();
+    }
+
+    public void HideControls()
+    {
+        var sb = new Storyboard();
+        var anim = new DoubleAnimation
+        {
+            To = _controlsHeight,
+            Duration = TimeSpan.FromMilliseconds(350),
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
+        };
+        Storyboard.SetTarget(anim, ControlsTranslate);
+        Storyboard.SetTargetProperty(anim, "Y");
+        sb.Children.Add(anim);
+        sb.Completed += (_, __) => ControlsContainer.Visibility = Visibility.Collapsed;
+        sb.Begin();
     }
 }

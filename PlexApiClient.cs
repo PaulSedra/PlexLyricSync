@@ -14,17 +14,20 @@ public record PlexNowPlayingResult(
     int ViewOffsetMs,
     int DurationMs,
     string State,
-    string ClientId
+    string ClientId,
+    string AlbumArtUrl
 );
 
 public sealed class PlexApiClient : IDisposable
 {
     private readonly HttpClient _http;
     private readonly string _baseUrl;
+    private readonly string _token;
 
     public PlexApiClient(string plexBaseUrl, string plexToken)
     {
         _baseUrl = plexBaseUrl.TrimEnd('/');
+        _token = plexToken;
         _http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
         _http.DefaultRequestHeaders.TryAddWithoutValidation("X-Plex-Token", plexToken);
         _http.DefaultRequestHeaders.TryAddWithoutValidation("Cache-Control", "no-cache");
@@ -77,10 +80,18 @@ public sealed class PlexApiClient : IDisposable
         string state = plexamp.State;
         string clientId = player?.Attribute("machineIdentifier")?.Value ?? "";
 
+        // album art
+        string artPath = tr.Attribute("thumb")?.Value
+            ?? tr.Attribute("art")?.Value
+            ?? string.Empty;
+        string artUrl = string.IsNullOrWhiteSpace(artPath)
+            ? string.Empty
+            : $"{_baseUrl}{artPath}?X-Plex-Token={_token}";
+
         if (string.IsNullOrWhiteSpace(artist) && string.IsNullOrWhiteSpace(title))
             return null;
 
-        return new PlexNowPlayingResult(artist, album, title, offset, duration, state, clientId);
+        return new PlexNowPlayingResult(artist, album, title, offset, duration, state, clientId, artUrl);
     }
 
     /// <summary>
