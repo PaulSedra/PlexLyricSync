@@ -5,6 +5,7 @@ using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Dispatching;
+using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media.Imaging;
 
 namespace PlexLyricSync;
@@ -219,5 +220,15 @@ public sealed partial class MainWindow : Window
         }
         catch
         { }
+    }
+
+    private void Window_PointerEntered(object sender, PointerRoutedEventArgs e)
+    {
+        ControlPanel.ShowControls();
+    }
+
+    private void Window_PointerExited(object sender, PointerRoutedEventArgs e)
+    {
+        ControlPanel.HideControls();
     }
 }

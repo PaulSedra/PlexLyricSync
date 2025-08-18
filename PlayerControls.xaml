@@ -5,27 +5,48 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
-    <StackPanel Grid.Row="2" Spacing="6">
-        <StackPanel x:Name="Controls" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="12">
-            <Button
-                x:Name="PreviousButton"
-                Click="PreviousButton_Click">
-                <SymbolIcon x:Name="PreviousIcon" Symbol="Previous"/>
-            </Button>
-            <Button
-                x:Name="PlayPauseButton"
-                Click="PlayPauseButton_Click"
-                HorizontalAlignment="Center">
-                <SymbolIcon x:Name="PlayPauseIcon" Symbol="Play"/>
-            </Button>
-            <Button
-                x:Name="NextButton"
-                Click="NextButton_Click">
-                <SymbolIcon x:Name="NextIcon" Symbol="Next"/>
-            </Button>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel x:Name="ControlsContainer" Grid.Row="0" Spacing="6" RenderTransformOrigin="0.5,0">
+            <StackPanel.RenderTransform>
+                <TranslateTransform x:Name="ControlsTranslate" />
+            </StackPanel.RenderTransform>
+
+            <StackPanel x:Name="Controls" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="12">
+                <Button
+                    x:Name="PreviousButton"
+                    Click="PreviousButton_Click">
+                    <SymbolIcon x:Name="PreviousIcon" Symbol="Previous"/>
+                </Button>
+                <Button
+                    x:Name="PlayPauseButton"
+                    Click="PlayPauseButton_Click"
+                    HorizontalAlignment="Center">
+                    <SymbolIcon x:Name="PlayPauseIcon" Symbol="Play"/>
+                </Button>
+                <Button
+                    x:Name="NextButton"
+                    Click="NextButton_Click">
+                    <SymbolIcon x:Name="NextIcon" Symbol="Next"/>
+                </Button>
+            </StackPanel>
+
+            <TextBlock
+                x:Name="TimeLabel"
+                Foreground="#E6FFFFFF"
+                Opacity="0.9"
+                FontSize="12"
+                HorizontalAlignment="Right"/>
         </StackPanel>
+
         <Border
             x:Name="SongProgress"
+            Grid.Row="1"
+            Margin="0,6,0,0"
             Height="6"
             Background="#44FFFFFF"
             CornerRadius="3"
@@ -38,12 +59,5 @@
                 HorizontalAlignment="Left"
                 Width="0"/>
         </Border>
-        <TextBlock
-            x:Name="TimeLabel"
-            Foreground="#E6FFFFFF"
-            Opacity="0.9"
-            FontSize="12"
-            HorizontalAlignment="Right"
-        />
-    </StackPanel>
+    </Grid>
 </UserControl>
