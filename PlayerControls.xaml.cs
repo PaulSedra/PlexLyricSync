@@ -203,7 +203,7 @@ public sealed partial class PlayerControls : UserControl
         var anim = new DoubleAnimation
         {
             To = 0,
-            Duration = TimeSpan.FromMilliseconds(200),
+            Duration = TimeSpan.FromMilliseconds(350),
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
         };
         Storyboard.SetTarget(anim, ControlsTranslate);
@@ -218,7 +218,7 @@ public sealed partial class PlayerControls : UserControl
         var anim = new DoubleAnimation
         {
             To = _controlsHeight,
-            Duration = TimeSpan.FromMilliseconds(200),
+            Duration = TimeSpan.FromMilliseconds(350),
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn }
         };
         Storyboard.SetTarget(anim, ControlsTranslate);

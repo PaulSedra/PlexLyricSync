@@ -11,12 +11,17 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <StackPanel x:Name="ControlsContainer" Grid.Row="0" Spacing="6" RenderTransformOrigin="0.5,0">
-            <StackPanel.RenderTransform>
+        <Grid x:Name="ControlsContainer" Grid.Row="0" RenderTransformOrigin="0.5,0">
+            <Grid.RenderTransform>
                 <TranslateTransform x:Name="ControlsTranslate" />
-            </StackPanel.RenderTransform>
+            </Grid.RenderTransform>
 
-            <StackPanel x:Name="Controls" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel x:Name="Controls" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="12" Grid.Column="0">
                 <Button
                     x:Name="PreviousButton"
                     Click="PreviousButton_Click">
@@ -37,11 +42,13 @@
 
             <TextBlock
                 x:Name="TimeLabel"
+                Grid.Column="1"
                 Foreground="#E6FFFFFF"
                 Opacity="0.9"
                 FontSize="12"
+                VerticalAlignment="Center"
                 HorizontalAlignment="Right"/>
-        </StackPanel>
+        </Grid>
 
         <Border
             x:Name="SongProgress"

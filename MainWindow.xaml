@@ -23,30 +23,29 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
-                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
                 <!-- ArtistBlock/NowPlaying -->
                 <StackPanel Grid.Row="0" Spacing="2">
                     <TextBlock
-                   x:Name="ArtistBlock"
-                   FontSize="14"
-                   Text="{x:Bind NowPlaying.Text, Mode=OneWay}"
-               />
+                        x:Name="ArtistBlock"
+                        FontSize="14"
+                        Text="{x:Bind NowPlaying.Text, Mode=OneWay}"
+                    />
                     <TextBlock
-                   x:Name="NowPlaying"
-                   FontSize="18"
-                   Foreground="White"
-                   Text="Waiting for playback…"
-                   TextWrapping="WrapWholeWords"
-               />
+                        x:Name="NowPlaying"
+                        FontSize="18"
+                        Foreground="White"
+                        Text="Waiting for playback…"
+                        TextWrapping="WrapWholeWords"
+                    />
                 </StackPanel>
 
-                <!-- Lyrics view -->
-                <local:LyricsView Grid.Row="1" x:Name="LyricsView"/>
-
-                <!-- Controls/SongProgress/TimeLabel -->
-                <local:PlayerControls x:Name="ControlPanel" Grid.Row="2" />
+                <!-- Lyrics and controls share the same row so lyrics stay centered -->
+                <Grid Grid.Row="1">
+                    <local:LyricsView x:Name="LyricsView" VerticalAlignment="Center"/>
+                    <local:PlayerControls x:Name="ControlPanel" VerticalAlignment="Bottom"/>
+                </Grid>
             </Grid>
         </Grid>
     </Grid>
