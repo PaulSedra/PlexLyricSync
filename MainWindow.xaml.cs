@@ -3,16 +3,15 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.Graphics;
-using Windows.System;
 
 namespace PlexLyricSync;
 
 public sealed partial class MainWindow : Window
 {
-    private const int startWidth = 480, startHeight = 720;
+    private const int startWidth = 600, startHeight = 600;
 
     private string PlexBaseUrl;
     private string PlexToken;
@@ -22,7 +21,7 @@ public sealed partial class MainWindow : Window
     private CancellationTokenSource? _pollCts;
 
     // latest plex metadata
-    private string _artist = "", _album = "", _title = "";
+    private string _artist = "", _album = "", _title = "", _albumArtUrl = "";
     internal string _state = "";
     internal int _durationMs = 0;
     private int _viewOffsetMs = 0;
@@ -49,6 +48,7 @@ public sealed partial class MainWindow : Window
         // provide self reference for control callbacks
         ControlPanel.MainWindow = this;
         ControlPanel.LyricsView = LyricsView;
+        LyricsView.MainWindow = this;
 
         // plex url and token from secerets file
         var secrets = SecretsLoader.LoadSecrets();
@@ -56,8 +56,6 @@ public sealed partial class MainWindow : Window
         PlexToken = secrets.PlexToken;
 
         NowPlaying.Text = "Connecting to Plex";
-
-        LyricsView.SeekToAsync = SeekToMsAsync;
 
         this.Closed += (_, __) =>
         {
@@ -74,12 +72,12 @@ public sealed partial class MainWindow : Window
         _plex = new PlexApiClient(PlexBaseUrl, PlexToken);
 
         // Start UI prediction (keeps the bar moving smoothly between Plex updates)
-        _uiTimer.Tick += (_, __) => UpdateProgressFromPrediction();
+        _uiTimer.Tick += (_, __) => ForecastTrackProgress();
         _uiTimer.Start();
 
         // Kick an immediate poll and the background poll loop
         _pollCts = new CancellationTokenSource();
-        await PollPlexOnceAsync(_pollCts.Token);
+        await PollPlexAsync(_pollCts.Token);
         _ = RunPollLoopAsync(_pollCts.Token);
     }
 
@@ -89,11 +87,11 @@ public sealed partial class MainWindow : Window
         using var timer = new System.Threading.PeriodicTimer(TimeSpan.FromMilliseconds(200));
         while (await timer.WaitForNextTickAsync(ct))
         {
-            await PollPlexOnceAsync(ct);
+            await PollPlexAsync(ct);
         }
     }
 
-    private async Task PollPlexOnceAsync(CancellationToken ct)
+    private async Task PollPlexAsync(CancellationToken ct)
     {
         try
         {
@@ -102,12 +100,14 @@ public sealed partial class MainWindow : Window
 
             if (np is null)
             {
-                _artist = _album = _title = _state = "";
+                _artist = _album = _title = _albumArtUrl = _state = "";
                 _durationMs = 0;
                 _viewOffsetMs = 0;
 
                 _predictedViewOffsetMs = 0;
                 _predictedViewOffsetUtc = now;
+
+                LyricsView._lrc = null;
 
                 DispatcherQueue.TryEnqueue(UpdateTrackInformation);
                 return;
@@ -117,7 +117,7 @@ public sealed partial class MainWindow : Window
             _clientId = np.ClientId ?? _clientId;
 
             // change detection
-            bool trackChanged = np.Artist != _artist || np.Album != _album || np.Title != _title || np.DurationMs != _durationMs;
+            bool trackChanged = np.Artist != _artist || np.Album != _album || np.Title != _title || np.DurationMs != _durationMs || np.AlbumArtUrl != _albumArtUrl;
             bool stateChanged = !np.State.Equals(_state, StringComparison.OrdinalIgnoreCase);
             bool viewOffsetChanged = np.ViewOffsetMs != _viewOffsetMs;
 
@@ -127,6 +127,7 @@ public sealed partial class MainWindow : Window
                 _artist = np.Artist;
                 _album = np.Album;
                 _title = np.Title;
+                _albumArtUrl = np.AlbumArtUrl;
                 _durationMs = np.DurationMs;
                 _state = np.State;
 
@@ -141,22 +142,20 @@ public sealed partial class MainWindow : Window
             if (trackChanged)
             {
                 var trackKey = $"{_artist}|{_album}|{_title}|{_durationMs}";
+                DispatcherQueue.TryEnqueue(UpdateTrackInformation);
                 await LyricsView.FetchLyricsAsync(_artist, _album, _title, trackKey, ct).ConfigureAwait(false);
             }
-
-            // Update labels
-            DispatcherQueue.TryEnqueue(UpdateTrackInformation);
         }
         catch
         { }
     }
 
-    internal void UpdateProgressFromPrediction()
+    internal void ForecastTrackProgress()
     {
         if (_durationMs <= 0)
         {
-            UpdateTrackInformation();
-            LyricsView.UpdateProgress(0);
+            _predictedViewOffsetMs = 0;
+            UpdateTrackProgress();
             return;
         }
 
@@ -167,20 +166,10 @@ public sealed partial class MainWindow : Window
             : _predictedViewOffsetMs;
         _predictedViewOffsetUtc = now;
 
-        UpdateTrackInformation();
-        LyricsView.UpdateProgress(_predictedViewOffsetMs);
+        UpdateTrackProgress();
     }
 
-    /// <summary>
-    /// Updates artist/title text and delegates progress updates to the control panel.
-    /// </summary>
-    internal void UpdateTrackInformation()
-    {
-        ArtistBlock.Text = !string.IsNullOrWhiteSpace(_artist) ? _artist : "";
-        NowPlaying.Text = !string.IsNullOrWhiteSpace(_title) ? _title : "Peace and quiet";
-        ControlPanel.UpdateTrackInformation(_predictedViewOffsetMs, _durationMs, _state);
-    }
-    private async Task SeekToMsAsync(int targetMs)
+    internal async Task SeekToMsAsync(int targetMs)
     {
         try
         {
@@ -193,10 +182,44 @@ public sealed partial class MainWindow : Window
             _predictedViewOffsetMs = targetMs;
             _predictedViewOffsetUtc = DateTime.UtcNow;
 
-            LyricsView.UpdateProgress(targetMs);
-            DispatcherQueue.TryEnqueue(UpdateTrackInformation);
+            DispatcherQueue.TryEnqueue(UpdateTrackProgress);
         }
         catch
         { }
+    }
+
+    /// <summary>
+    /// Updates track title/artist and album art.
+    /// </summary>
+    internal void UpdateTrackInformation()
+    {
+        ArtistBlock.Text = !string.IsNullOrWhiteSpace(_artist) ? _artist : "";
+        NowPlaying.Text = !string.IsNullOrWhiteSpace(_title) ? _title : "Peace and quiet";
+        AlbumArtImage.Source = !string.IsNullOrWhiteSpace(_albumArtUrl) ? new BitmapImage(new Uri(_albumArtUrl)) : null;
+    }
+
+    /// <summary>
+    /// Updates track progress by calling respective methods from LyricsView and ControlPanel.
+    /// </summary>
+    internal void UpdateTrackProgress()
+    {
+        ControlPanel.UpdateTrackInformation(_predictedViewOffsetMs, _durationMs, _state);
+        LyricsView.UpdateProgress(_predictedViewOffsetMs);
+    }
+
+    /// <summary>
+    /// Shows player controls when the mouse enters the window.
+    /// </summary>
+    private void Window_PointerEntered(object _, PointerRoutedEventArgs __)
+    {
+        ControlPanel.AnimateControls(0);
+    }
+
+    /// <summary>
+    /// Hides player controls when the mouse leaves the window.
+    /// </summary>
+    private void Window_PointerExited(object _, PointerRoutedEventArgs __)
+    {
+        ControlPanel.AnimateControls(ControlPanel._controlsHeight);
     }
 }

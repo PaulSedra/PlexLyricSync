@@ -7,42 +7,45 @@
     Title="PlexLyricSync">
 
 
-    <Grid Background="#CC111111">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="20"/>
-            <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
+    <Grid Background="Transparent" PointerEntered="Window_PointerEntered" PointerExited="Window_PointerExited">
+        <!-- Album art background -->
+        <Image x:Name="AlbumArtImage" Stretch="UniformToFill" />
 
-        <Grid x:Name="DragRegion" Grid.Row="0" Background="Transparent"/>
-
-        <Grid x:Name="Root" x:FieldModifier="internal" Grid.Row="1" Padding="16 0 16 16">
+        <Grid Background="#CC111111">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="30"/>
                 <RowDefinition Height="*"/>
-                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <!-- ArtistBlock/NowPlaying -->
-            <StackPanel Grid.Row="0" Spacing="2">
-                <TextBlock
-               x:Name="ArtistBlock"
-               FontSize="14"
-               Text="{x:Bind NowPlaying.Text, Mode=OneWay}"
-           />
-                <TextBlock
-               x:Name="NowPlaying"
-               FontSize="18"
-               Foreground="White"
-               Text="Waiting for playback…"
-               TextWrapping="WrapWholeWords"
-           />
-            </StackPanel>
+            <Grid x:Name="DragRegion" Grid.Row="0" Background="Transparent" HorizontalAlignment="Left" Width="520"/>
 
-            <!-- Lyrics view -->
-            <local:LyricsView Grid.Row="1" x:Name="LyricsView"/>
+            <Grid x:Name="Root" x:FieldModifier="internal" Grid.Row="1" Margin="0 -14 0 0" Padding="16 0 16 16">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="45"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
 
-            <!-- Controls/SongProgress/TimeLabel -->
-            <local:PlayerControls x:Name="ControlPanel" Grid.Row="2" />
+                <!-- ArtistBlock/NowPlaying -->
+                <StackPanel Grid.Row="0" Spacing="2" HorizontalAlignment="Left" Width="300">
+                    <TextBlock
+                        x:Name="ArtistBlock"
+                        FontSize="14"
+                        Text="{x:Bind NowPlaying.Text, Mode=OneWay}"
+                    />
+                    <TextBlock
+                        x:Name="NowPlaying"
+                        FontSize="18"
+                        Foreground="White"
+                        Text="Waiting for playback…"
+                        TextWrapping="WrapWholeWords"
+                    />
+                </StackPanel>
+
+                <Grid Grid.Row="1">
+                    <local:LyricsView x:Name="LyricsView" VerticalAlignment="Stretch" HorizontalAlignment="Stretch"/>
+                    <local:PlayerControls x:Name="ControlPanel" VerticalAlignment="Bottom"/>
+                </Grid>
+            </Grid>
         </Grid>
     </Grid>
 

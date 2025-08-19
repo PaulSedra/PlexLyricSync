@@ -12,14 +12,14 @@ namespace PlexLyricSync;
 
 public sealed partial class LyricsView : UserControl
 {
+    public MainWindow? MainWindow { get; set; }
+
     internal readonly LyricsClient _lyrics = new();
     internal List<LrcLine>? _lrc;
     internal bool _hasSynced = false;
     internal string _trackKey = "";
     internal int _curLyricIdx = -1;
     internal string? _localPath;
-
-    public Func<int, Task>? SeekToAsync { get; set; }
 
     public LyricsView()
     {
@@ -212,10 +212,7 @@ public sealed partial class LyricsView : UserControl
             _curLyricIdx = targetIdx;
             UpdateSyncedLyricStack(_curLyricIdx);
 
-            if (SeekToAsync is not null)
-            {
-                await SeekToAsync(targetMs);
-            }
+            if (MainWindow is not null) await MainWindow.SeekToMsAsync(targetMs);
         }
         catch { }
     }

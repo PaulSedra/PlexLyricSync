@@ -5,45 +5,87 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
-    <StackPanel Grid.Row="2" Spacing="6">
-        <StackPanel x:Name="Controls" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="12">
-            <Button
-                x:Name="PreviousButton"
-                Click="PreviousButton_Click">
-                <SymbolIcon x:Name="PreviousIcon" Symbol="Previous"/>
-            </Button>
-            <Button
-                x:Name="PlayPauseButton"
-                Click="PlayPauseButton_Click"
-                HorizontalAlignment="Center">
-                <SymbolIcon x:Name="PlayPauseIcon" Symbol="Play"/>
-            </Button>
-            <Button
-                x:Name="NextButton"
-                Click="NextButton_Click">
-                <SymbolIcon x:Name="NextIcon" Symbol="Next"/>
-            </Button>
-        </StackPanel>
-        <Border
-            x:Name="SongProgress"
-            Height="6"
-            Background="#44FFFFFF"
-            CornerRadius="3"
-            PointerPressed="SongProgress_PointerPressed"
-            PointerMoved="SongProgress_PointerMoved"
-            PointerReleased="SongProgress_PointerReleased">
+    <Grid>
+        <Grid x:Name="ControlsContainer" RenderTransformOrigin="0.5,0">
+            <Grid.RenderTransform>
+                <TranslateTransform x:Name="ControlsTranslate" />
+            </Grid.RenderTransform>
+
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
             <Border
-                x:Name="SongProgressFill"
-                Background="{ThemeResource SystemAccentColor}"
-                HorizontalAlignment="Left"
-                Width="0"/>
-        </Border>
-        <TextBlock
-            x:Name="TimeLabel"
-            Foreground="#E6FFFFFF"
-            Opacity="0.9"
-            FontSize="12"
-            HorizontalAlignment="Right"
-        />
-    </StackPanel>
+                x:Name="SongProgress"
+                Grid.Row="0"
+                Margin="0 0 0 0"
+                Height="6"
+                Background="#44FFFFFF"
+                CornerRadius="3"
+                PointerPressed="SongProgress_PointerPressed"
+                PointerMoved="SongProgress_PointerMoved"
+                PointerReleased="SongProgress_PointerReleased">
+                <Border
+                    x:Name="SongProgressFill"
+                    Background="{ThemeResource SystemAccentColor}"
+                    HorizontalAlignment="Left"
+                    Width="0"/>
+            </Border>
+
+            <Grid Grid.Row="1" Margin="0 14 0 0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel x:Name="Controls" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="12" Grid.Column="1">
+                    <Button
+                        x:Name="PreviousButton"
+                        Background="Transparent"
+                        BorderBrush="Transparent"
+                        BorderThickness="0"
+                        Height="40"
+                        Width="40"
+                        Click="PreviousButton_Click"
+                    >
+                        <FontIcon x:Name="PreviousIcon" Glyph="&#xf8ac;" FontFamily="Segoe Fluent Icons" Foreground="White"/>
+                    </Button>
+                    <Button
+                        x:Name="PlayPauseButton"
+                        Background="Transparent"
+                        BorderBrush="Transparent"
+                        BorderThickness="0"
+                        Height="40"
+                        Width="40"
+                        HorizontalAlignment="Center"
+                        Click="PlayPauseButton_Click"
+                    >
+                        <FontIcon x:Name="PlayPauseIcon" Glyph="&#xf5b0;" FontFamily="Segoe Fluent Icons" Foreground="White"/>
+                    </Button>
+                    <Button
+                        x:Name="NextButton"
+                        Background="Transparent"
+                        BorderBrush="Transparent"
+                        BorderThickness="0"
+                        Height="40"
+                        Width="40"
+                        Click="NextButton_Click"
+                    >
+                        <FontIcon x:Name="NextIcon" Glyph="&#xf8ad;" FontFamily="Segoe Fluent Icons" Foreground="White"/>
+                    </Button>
+                </StackPanel>
+
+                <TextBlock
+                    x:Name="TimeLabel"
+                    Grid.ColumnSpan="3"
+                    Foreground="#E6FFFFFF"
+                    Opacity="0.9"
+                    FontSize="12"
+                    VerticalAlignment="Center"
+                    HorizontalAlignment="Right"/>
+            </Grid>
+        </Grid>
+    </Grid>
 </UserControl>

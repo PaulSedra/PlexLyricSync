@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media.Animation;
 
 namespace PlexLyricSync;
 
@@ -13,10 +14,17 @@ public sealed partial class PlayerControls : UserControl
     public LyricsView? LyricsView { get; set; }
 
     private bool _isSeeking = false;     // true while user is dragging the progress bar
+    internal double _controlsHeight;
 
     public PlayerControls()
     {
         this.InitializeComponent();
+
+        ControlsContainer.Loaded += (_, __) =>
+        {
+            _controlsHeight = ControlsContainer.ActualHeight + 32;
+            ControlsTranslate.Y = _controlsHeight;
+        };
     }
 
     /// <summary>
@@ -56,7 +64,7 @@ public sealed partial class PlayerControls : UserControl
 
             mainWindow.DispatcherQueue.TryEnqueue(() =>
             {
-                mainWindow.UpdateTrackInformation();
+                mainWindow.UpdateTrackProgress();
                 if (lyricView._hasSynced && lyricView._lrc is not null && lyricView._lrc.Count > 0)
                     lyricView.UpdateSyncedLyricStack(lyricView._curLyricIdx);
             });
@@ -123,7 +131,7 @@ public sealed partial class PlayerControls : UserControl
             bool ok;
             if (mainWindow._state.Equals("playing", StringComparison.OrdinalIgnoreCase))
             {
-                mainWindow.UpdateProgressFromPrediction();
+                mainWindow.ForecastTrackProgress();
                 ok = await mainWindow._plex.PauseAsync(mainWindow._clientId, cts.Token);
                 if (!ok) return;
                 mainWindow._state = "paused";
@@ -135,8 +143,8 @@ public sealed partial class PlayerControls : UserControl
                 mainWindow._state = "playing";
                 mainWindow._predictedViewOffsetUtc = DateTime.UtcNow;
             }
-
-            mainWindow.DispatcherQueue.TryEnqueue(mainWindow.UpdateTrackInformation);
+            
+            mainWindow.DispatcherQueue.TryEnqueue(mainWindow.UpdateTrackProgress);
         }
         catch
         {}
@@ -177,12 +185,31 @@ public sealed partial class PlayerControls : UserControl
             ? 0
             : SongProgress.ActualWidth * Math.Clamp(predictedViewOffsetMs / durationMs, 0, 1);
         TimeLabel.Text = $"{FormatTime(predictedViewOffsetMs)} / {FormatTime(durationMs)}";
-        PlayPauseIcon.Symbol = state.Equals("playing", StringComparison.OrdinalIgnoreCase) ? Symbol.Pause : Symbol.Play;
+        PlayPauseIcon.Glyph = state.Equals("playing", StringComparison.OrdinalIgnoreCase) ? "\uf8ae" : "\uf5b0";
     }
 
     private static string FormatTime(double ms)
     {
         var ts = TimeSpan.FromMilliseconds(ms);
         return $"{(int)ts.TotalMinutes:D2}:{ts.Seconds:D2}";
+    }
+
+    /// <summary>
+    /// Handles show/hide animation of the ControlsContainer.
+    /// </summary>
+    /// <param name="pixels">number of pixels to translate element</param>
+    public void AnimateControls(double pixels)
+    {
+        var sb = new Storyboard();
+        var anim = new DoubleAnimation
+        {
+            To = pixels,
+            Duration = TimeSpan.FromMilliseconds(400),
+            EasingFunction = new CubicEase { EasingMode = pixels == 0? EasingMode.EaseOut : EasingMode.EaseIn }
+        };
+        Storyboard.SetTarget(anim, ControlsTranslate);
+        Storyboard.SetTargetProperty(anim, "Y");
+        sb.Children.Add(anim);
+        sb.Begin();
     }
 }
