@@ -5,7 +5,10 @@
     xmlns:local="using:PlexLyricSync"
     Background="Gray">
     <Grid Padding="20">
-        <TabView IsAddTabButtonVisible="False">
+        <TabView IsAddTabButtonVisible="False" TabStripMargin="0">
+            <TabView.Resources>
+                <CornerRadius x:Key="TabViewItemHeaderCornerRadius">0</CornerRadius>
+            </TabView.Resources>
             <TabViewItem Header="Plex" IsClosable="False">
                 <StackPanel Spacing="12">
                     <TextBox x:Name="PlexUrlBox" Header="Plex URL" TextChanged="SettingChanged"/>
