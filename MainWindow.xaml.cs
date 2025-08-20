@@ -50,10 +50,10 @@ public sealed partial class MainWindow : Window
         ControlPanel.LyricsView = LyricsView;
         LyricsView.MainWindow = this;
 
-        // plex url and token from secerets file
-        var secrets = SecretsLoader.LoadSecrets();
-        PlexBaseUrl = secrets.PlexBaseUrl;
-        PlexToken = secrets.PlexToken;
+        // plex url and token from config file
+        var config = ConfigLoader.LoadConfigAsync(this).GetAwaiter().GetResult();
+        PlexBaseUrl = config.PlexBaseUrl;
+        PlexToken = config.PlexToken;
 
         NowPlaying.Text = "Connecting to Plex";
 
