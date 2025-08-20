@@ -7,6 +7,7 @@ namespace PlexLyricSync;
 public sealed partial class SettingsPage : Page
 {
     private MainWindow? _mainWindow;
+    private ConfigLoader.Config _cfg = new();
 
     public SettingsPage()
     {
@@ -17,22 +18,22 @@ public sealed partial class SettingsPage : Page
     {
         base.OnNavigatedTo(e);
         _mainWindow = e.Parameter as MainWindow;
-        var cfg = ConfigLoader.LoadExisting();
-        PlexUrlBox.Text = cfg.PlexBaseUrl;
-        PlexTokenBox.Text = cfg.PlexToken;
+        _cfg = ConfigLoader.LoadExisting();
+        PlexUrlBox.Text = _cfg.PlexBaseUrl;
+        PlexTokenBox.Text = _cfg.PlexToken;
     }
 
-    private async void SaveButton_Click(object sender, RoutedEventArgs e)
+    private async void SettingChanged(object sender, TextChangedEventArgs e)
     {
         if (_mainWindow is null) return;
-        var cfg = new ConfigLoader.Config
+        _cfg.PlexBaseUrl = PlexUrlBox.Text;
+        _cfg.PlexToken = PlexTokenBox.Text;
+        ConfigLoader.SaveConfig(_cfg);
+        if (!string.IsNullOrWhiteSpace(_cfg.PlexBaseUrl) &&
+            !string.IsNullOrWhiteSpace(_cfg.PlexToken))
         {
-            PlexBaseUrl = PlexUrlBox.Text,
-            PlexToken = PlexTokenBox.Text
-        };
-        ConfigLoader.SaveConfig(cfg);
-        await _mainWindow.UpdateConfigAsync(cfg);
-        _mainWindow.CloseSettings();
+            await _mainWindow.UpdateConfigAsync(_cfg);
+        }
     }
 
     private void BackButton_Click(object sender, RoutedEventArgs e)
