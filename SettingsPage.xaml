@@ -5,17 +5,21 @@
     xmlns:local="using:PlexLyricSync"
     Background="Gray">
     <Grid Padding="20">
-        <TabView IsAddTabButtonVisible="False">
-            <TabView.Resources>
-                <CornerRadius x:Key="TabViewItemHeaderCornerRadius">0</CornerRadius>
-            </TabView.Resources>
-            <TabViewItem Header="Plex" IsClosable="False">
-                <StackPanel Spacing="12">
-                    <TextBox x:Name="PlexUrlBox" Header="Plex URL" TextChanged="SettingChanged"/>
-                    <TextBox x:Name="PlexTokenBox" Header="Plex Token" TextChanged="SettingChanged"/>
-                    <Button Content="Back" HorizontalAlignment="Right" Click="BackButton_Click"/>
-                </StackPanel>
-            </TabViewItem>
-        </TabView>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="200"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <ListBox x:Name="NavTabs" SelectionChanged="NavTabs_SelectionChanged" Background="#333" Foreground="White" BorderThickness="0" Margin="0,0,20,0">
+            <ListBoxItem Content="Plex"/>
+        </ListBox>
+
+        <Grid Grid.Column="1">
+            <StackPanel x:Name="PlexPanel" Spacing="12">
+                <TextBox x:Name="PlexUrlBox" Header="Plex URL" TextChanged="SettingChanged"/>
+                <TextBox x:Name="PlexTokenBox" Header="Plex Token" TextChanged="SettingChanged"/>
+                <Button Content="Back" HorizontalAlignment="Right" Click="BackButton_Click"/>
+            </StackPanel>
+        </Grid>
     </Grid>
 </Page>

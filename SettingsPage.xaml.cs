@@ -28,6 +28,8 @@ public sealed partial class SettingsPage : Page
         PlexUrlBox.Text = _cfg.PlexBaseUrl;
         PlexTokenBox.Text = _cfg.PlexToken;
         _loading = false;
+
+        NavTabs.SelectedIndex = 0;
     }
 
     private void SettingChanged(object sender, TextChangedEventArgs e)
@@ -53,5 +55,16 @@ public sealed partial class SettingsPage : Page
     private void BackButton_Click(object sender, RoutedEventArgs e)
     {
         _mainWindow?.CloseSettings();
+    }
+
+    private void NavTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        PlexPanel.Visibility = Visibility.Collapsed;
+
+        // Only one panel currently, but structure allows future categories
+        if (NavTabs.SelectedIndex == 0)
+        {
+            PlexPanel.Visibility = Visibility.Visible;
+        }
     }
 }
