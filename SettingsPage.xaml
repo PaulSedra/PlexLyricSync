@@ -5,7 +5,7 @@
     xmlns:local="using:PlexLyricSync"
     Background="Gray">
     <Grid Padding="20">
-        <TabView IsAddTabButtonVisible="False" TabStripMargin="0">
+        <TabView IsAddTabButtonVisible="False">
             <TabView.Resources>
                 <CornerRadius x:Key="TabViewItemHeaderCornerRadius">0</CornerRadius>
             </TabView.Resources>
