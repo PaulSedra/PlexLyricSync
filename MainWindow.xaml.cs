@@ -13,8 +13,8 @@ public sealed partial class MainWindow : Window
 {
     private const int startWidth = 600, startHeight = 600;
 
-    private string PlexBaseUrl;
-    private string PlexToken;
+    internal string PlexBaseUrl = "";
+    internal string PlexToken = "";
 
     internal PlexApiClient? _plex;
     internal string _clientId = "";       // Plex player's machineIdentifier
@@ -58,6 +58,33 @@ public sealed partial class MainWindow : Window
             _plex?.Dispose();
             _uiTimer.Stop();
         };
+    }
+
+    internal void OpenSettings()
+    {
+        SettingsFrame.Navigate(typeof(SettingsPage), this);
+        Root.Visibility = Visibility.Collapsed;
+        SettingsFrame.Visibility = Visibility.Visible;
+    }
+
+    internal void CloseSettings()
+    {
+        SettingsFrame.Visibility = Visibility.Collapsed;
+        Root.Visibility = Visibility.Visible;
+    }
+
+    internal async Task UpdateConfigAsync(ConfigLoader.Config cfg)
+    {
+        PlexBaseUrl = cfg.PlexBaseUrl;
+        PlexToken = cfg.PlexToken;
+
+        _pollCts?.Cancel();
+        _plex?.Dispose();
+        _pollCts = null;
+
+        NowPlaying.Text = "Connecting to Plex";
+
+        await InitAsync();
     }
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)

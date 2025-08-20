@@ -17,18 +17,34 @@ public static class ConfigLoader
         public string PlexToken { get; set; } = "";
     }
 
+    private static string GetConfigPath()
+    {
+        var localDir = ApplicationData.Current.LocalFolder.Path;
+        return Path.Combine(localDir, "appsettings.config.yaml");
+    }
+
+    public static Config LoadExisting()
+    {
+        var path = GetConfigPath();
+        return File.Exists(path) ? Deserialize(path) : new Config();
+    }
+
+    public static void SaveConfig(Config cfg)
+    {
+        var path = GetConfigPath();
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path,
+            $"PlexBaseUrl: \"{cfg.PlexBaseUrl}\"{Environment.NewLine}" +
+            $"PlexToken: \"{cfg.PlexToken}\"{Environment.NewLine}");
+    }
+
     public static async Task<Config> LoadConfigAsync(Window window)
     {
-        // Packaged-safe writable directory
-        var localDir = ApplicationData.Current.LocalFolder.Path;
-        var localPath = Path.Combine(localDir, "appsettings.config.yaml");
+        var path = GetConfigPath();
 
         // If config already exists, load it
-        if (File.Exists(localPath))
-            return Deserialize(localPath);
-
-        // Ensure LocalFolder exists
-        Directory.CreateDirectory(localDir);
+        if (File.Exists(path))
+            return Deserialize(path);
 
         // Ask user for configuration
         var urlBox = new TextBox();
@@ -61,10 +77,7 @@ public static class ConfigLoader
             PlexToken = tokenBox.Text
         };
 
-        File.WriteAllText(localPath,
-            $"PlexBaseUrl: \"{cfg.PlexBaseUrl}\"\n" +
-            $"PlexToken: \"{cfg.PlexToken}\"\n");
-
+        SaveConfig(cfg);
         return cfg;
     }
 
