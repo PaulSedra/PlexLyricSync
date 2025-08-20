@@ -50,12 +50,7 @@ public sealed partial class MainWindow : Window
         ControlPanel.LyricsView = LyricsView;
         LyricsView.MainWindow = this;
 
-        // plex url and token from config file
-        var config = ConfigLoader.LoadConfigAsync(this).GetAwaiter().GetResult();
-        PlexBaseUrl = config.PlexBaseUrl;
-        PlexToken = config.PlexToken;
-
-        NowPlaying.Text = "Connecting to Plex";
+        this.Loaded += MainWindow_Loaded;
 
         this.Closed += (_, __) =>
         {
@@ -63,8 +58,21 @@ public sealed partial class MainWindow : Window
             _plex?.Dispose();
             _uiTimer.Stop();
         };
+    }
 
-        _ = InitAsync();
+    private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
+    {
+        // Ensure this only runs once
+        Loaded -= MainWindow_Loaded;
+
+        // plex url and token from config file
+        var config = await ConfigLoader.LoadConfigAsync(this);
+        PlexBaseUrl = config.PlexBaseUrl;
+        PlexToken = config.PlexToken;
+
+        NowPlaying.Text = "Connecting to Plex";
+
+        await InitAsync();
     }
 
     private async Task InitAsync()
