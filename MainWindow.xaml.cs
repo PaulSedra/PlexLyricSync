@@ -50,7 +50,7 @@ public sealed partial class MainWindow : Window
         ControlPanel.LyricsView = LyricsView;
         LyricsView.MainWindow = this;
 
-        this.Loaded += MainWindow_Loaded;
+        ((FrameworkElement)Content).Loaded += MainWindow_Loaded;
 
         this.Closed += (_, __) =>
         {
@@ -63,7 +63,7 @@ public sealed partial class MainWindow : Window
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
         // Ensure this only runs once
-        Loaded -= MainWindow_Loaded;
+        ((FrameworkElement)sender).Loaded -= MainWindow_Loaded;
 
         // plex url and token from config file
         var config = await ConfigLoader.LoadConfigAsync(this);
