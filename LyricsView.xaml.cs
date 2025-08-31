@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Windows.UI.Text;
 
 namespace PlexLyricSync;
 
@@ -23,10 +24,15 @@ public sealed partial class LyricsView : UserControl
     private int _scrollOffset = 0;
     private int _visibleLines = 3;
     internal string? _localPath;
+    private readonly TextBlock[] _syncedBlocks;
+    private readonly double[] _baseSizes = { 16, 18, 20, 22, 20, 18, 16 };
+    private readonly double[] _baseOpacities = { 0.35, 0.45, 0.65, 1.0, 0.80, 0.55, 0.35 };
 
     public LyricsView()
     {
         this.InitializeComponent();
+
+        _syncedBlocks = new[] { LyPrev3, LyPrev2, LyPrev1, LyCurr0, LyNext1, LyNext2, LyNext3 };
 
         LyPrev3.Tapped += async (_, __) => await SeekToRelativeAsync(-3);
         LyPrev2.Tapped += async (_, __) => await SeekToRelativeAsync(-2);
@@ -209,6 +215,23 @@ public sealed partial class LyricsView : UserControl
         LyNext1.Text = L(idx + 1);
         LyNext2.Text = L(idx + 2);
         LyNext3.Text = L(idx + 3);
+
+        for (int i = 0; i < _syncedBlocks.Length; i++)
+        {
+            var tb = _syncedBlocks[i];
+            tb.FontSize = _baseSizes[i];
+            tb.Opacity = _baseOpacities[i];
+            tb.FontWeight = FontWeights.Normal;
+        }
+
+        int curPos = _curLyricIdx - idx;
+        if (curPos >= -3 && curPos <= 3)
+        {
+            var highlight = _syncedBlocks[curPos + 3];
+            highlight.FontSize = 22;
+            highlight.Opacity = 1.0;
+            highlight.FontWeight = FontWeights.SemiBold;
+        }
     }
 
     /// <summary>
