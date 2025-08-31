@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
-using Windows.UI.Text;
+using Microsoft.UI.Text;
 
 namespace PlexLyricSync;
 
@@ -285,6 +285,9 @@ public sealed partial class LyricsView : UserControl
         LyNext1.Visibility = _visibleLines >= 1 ? Visibility.Visible : Visibility.Collapsed;
         LyNext2.Visibility = _visibleLines >= 2 ? Visibility.Visible : Visibility.Collapsed;
         LyNext3.Visibility = _visibleLines >= 3 ? Visibility.Visible : Visibility.Collapsed;
+
+        if (_hasSynced && _lrc is not null)
+            UpdateSyncedLyricStack(_curLyricIdx + _scrollOffset);
     }
 
     /// <summary>

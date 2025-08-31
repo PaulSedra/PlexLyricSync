@@ -23,7 +23,6 @@
                            Minimum="0"
                            SpinButtonPlacementMode="Inline"
                            SmallChange="1"
-                           IsDecimalEnabled="False"
                            ValueChanged="SyncedLinesChanged"/>
                 <Button Content="Back" HorizontalAlignment="Right" Click="BackButton_Click"/>
             </StackPanel>
