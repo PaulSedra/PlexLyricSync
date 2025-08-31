@@ -40,11 +40,6 @@
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.7.250606001" />
     <PackageReference Include="YamlDotNet" Version="16.3.0" />
   </ItemGroup>
-  <ItemGroup>
-    <None Update="appsettings.secrets.yaml">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
 
   <!--
     Defining the "HasPackageAndPublishMenuAddedByProject" property here allows the Solution

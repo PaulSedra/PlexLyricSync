@@ -46,6 +46,8 @@
                     <local:PlayerControls x:Name="ControlPanel" VerticalAlignment="Bottom"/>
                 </Grid>
             </Grid>
+
+            <Frame x:Name="SettingsFrame" Grid.Row="1" Margin="0 -30 0 0" Padding="0" Visibility="Collapsed"/>
         </Grid>
     </Grid>
 

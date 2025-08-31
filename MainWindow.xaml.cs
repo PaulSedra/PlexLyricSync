@@ -13,8 +13,8 @@ public sealed partial class MainWindow : Window
 {
     private const int startWidth = 600, startHeight = 600;
 
-    private string PlexBaseUrl;
-    private string PlexToken;
+    internal string PlexBaseUrl = "";
+    internal string PlexToken = "";
 
     internal PlexApiClient? _plex;
     internal string _clientId = "";       // Plex player's machineIdentifier
@@ -50,12 +50,7 @@ public sealed partial class MainWindow : Window
         ControlPanel.LyricsView = LyricsView;
         LyricsView.MainWindow = this;
 
-        // plex url and token from secerets file
-        var secrets = SecretsLoader.LoadSecrets();
-        PlexBaseUrl = secrets.PlexBaseUrl;
-        PlexToken = secrets.PlexToken;
-
-        NowPlaying.Text = "Connecting to Plex";
+        ((FrameworkElement)Content).Loaded += MainWindow_Loaded;
 
         this.Closed += (_, __) =>
         {
@@ -63,8 +58,48 @@ public sealed partial class MainWindow : Window
             _plex?.Dispose();
             _uiTimer.Stop();
         };
+    }
 
-        _ = InitAsync();
+    internal void OpenSettings()
+    {
+        SettingsFrame.Navigate(typeof(SettingsPage), this);
+        Root.Visibility = Visibility.Collapsed;
+        SettingsFrame.Visibility = Visibility.Visible;
+    }
+
+    internal void CloseSettings()
+    {
+        SettingsFrame.Visibility = Visibility.Collapsed;
+        Root.Visibility = Visibility.Visible;
+    }
+
+    internal async Task UpdateConfigAsync(ConfigLoader.Config config)
+    {
+        PlexBaseUrl = config.PlexBaseUrl;
+        PlexToken = config.PlexToken;
+
+        _pollCts?.Cancel();
+        _plex?.Dispose();
+        _pollCts = null;
+
+        NowPlaying.Text = "Connecting to Plex";
+
+        await InitAsync();
+    }
+
+    private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
+    {
+        // Ensure this only runs once
+        ((FrameworkElement)sender).Loaded -= MainWindow_Loaded;
+
+        // plex url and token from config file
+        var config = await ConfigLoader.LoadConfigAsync(this);
+        PlexBaseUrl = config.PlexBaseUrl;
+        PlexToken = config.PlexToken;
+
+        NowPlaying.Text = "Connecting to Plex";
+
+        await InitAsync();
     }
 
     private async Task InitAsync()
@@ -147,7 +182,23 @@ public sealed partial class MainWindow : Window
             }
         }
         catch
-        { }
+        {
+            _artist = _album = _title = _albumArtUrl = _state = "";
+            _durationMs = 0;
+            _viewOffsetMs = 0;
+
+            _predictedViewOffsetMs = 0;
+            _predictedViewOffsetUtc = DateTime.UtcNow;
+
+            LyricsView.SetNoLyrics("Unable to connect to Plex. Check server URL or token.");
+
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                ArtistBlock.Text = string.Empty;
+                NowPlaying.Text = string.Empty;
+                AlbumArtImage.Source = null;
+            });
+        }
     }
 
     internal void ForecastTrackProgress()

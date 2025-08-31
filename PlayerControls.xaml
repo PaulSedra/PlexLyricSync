@@ -40,16 +40,29 @@
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
+                <Button
+                    x:Name="SettingsButton"
+                    Grid.Column="0"
+                    Background="Transparent"
+                    BorderBrush="Transparent"
+                    BorderThickness="0"
+                    Padding="0"
+                    Height="40"
+                    Width="40"
+                    Click="SettingsButton_Click">
+                    <FontIcon Glyph="&#xE713;" FontFamily="Segoe Fluent Icons" Foreground="White"/>
+                </Button>
+
                 <StackPanel x:Name="Controls" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="12" Grid.Column="1">
                     <Button
                         x:Name="PreviousButton"
                         Background="Transparent"
                         BorderBrush="Transparent"
                         BorderThickness="0"
+                        Padding="0"
                         Height="40"
                         Width="40"
-                        Click="PreviousButton_Click"
-                    >
+                        Click="PreviousButton_Click">
                         <FontIcon x:Name="PreviousIcon" Glyph="&#xf8ac;" FontFamily="Segoe Fluent Icons" Foreground="White"/>
                     </Button>
                     <Button
@@ -57,11 +70,11 @@
                         Background="Transparent"
                         BorderBrush="Transparent"
                         BorderThickness="0"
+                        Padding="0"
                         Height="40"
                         Width="40"
                         HorizontalAlignment="Center"
-                        Click="PlayPauseButton_Click"
-                    >
+                        Click="PlayPauseButton_Click">
                         <FontIcon x:Name="PlayPauseIcon" Glyph="&#xf5b0;" FontFamily="Segoe Fluent Icons" Foreground="White"/>
                     </Button>
                     <Button
@@ -69,10 +82,10 @@
                         Background="Transparent"
                         BorderBrush="Transparent"
                         BorderThickness="0"
+                        Padding="0"
                         Height="40"
                         Width="40"
-                        Click="NextButton_Click"
-                    >
+                        Click="NextButton_Click">
                         <FontIcon x:Name="NextIcon" Glyph="&#xf8ad;" FontFamily="Segoe Fluent Icons" Foreground="White"/>
                     </Button>
                 </StackPanel>

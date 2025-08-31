@@ -1,0 +1,70 @@
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Navigation;
+using System;
+
+namespace PlexLyricSync;
+
+public sealed partial class SettingsPage : Page
+{
+    private MainWindow? _mainWindow;
+    private ConfigLoader.Config _config = new();
+    private bool _loading = false;
+    private readonly DispatcherTimer _debounceTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
+
+    public SettingsPage()
+    {
+        this.InitializeComponent();
+        _debounceTimer.Tick += DebounceTimer_Tick;
+    }
+
+    protected override void OnNavigatedTo(NavigationEventArgs e)
+    {
+        base.OnNavigatedTo(e);
+        _mainWindow = e.Parameter as MainWindow;
+        _config = ConfigLoader.LoadExisting();
+
+        _loading = true;
+        PlexUrlBox.Text = _config.PlexBaseUrl;
+        PlexTokenBox.Text = _config.PlexToken;
+        _loading = false;
+
+        NavTabs.SelectedIndex = 0;
+    }
+
+    private void SettingChanged(object sender, TextChangedEventArgs e)
+    {
+        if (_loading || _mainWindow is null) return;
+
+        _config.PlexBaseUrl = PlexUrlBox.Text;
+        _config.PlexToken = PlexTokenBox.Text;
+        ConfigLoader.SaveConfig(_config);
+
+        _debounceTimer.Stop();
+        _debounceTimer.Start();
+    }
+
+    private async void DebounceTimer_Tick(object? sender, object e)
+    {
+        _debounceTimer.Stop();
+        if (_mainWindow is null) return;
+        if (string.IsNullOrWhiteSpace(_config.PlexBaseUrl) || string.IsNullOrWhiteSpace(_config.PlexToken)) return;
+        await _mainWindow.UpdateConfigAsync(_config);
+    }
+
+    private void BackButton_Click(object sender, RoutedEventArgs e)
+    {
+        _mainWindow?.CloseSettings();
+    }
+
+    private void NavTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        PlexPanel.Visibility = Visibility.Collapsed;
+
+        // Only one panel currently, but structure allows future categories
+        if (NavTabs.SelectedIndex == 0)
+        {
+            PlexPanel.Visibility = Visibility.Visible;
+        }
+    }
+}

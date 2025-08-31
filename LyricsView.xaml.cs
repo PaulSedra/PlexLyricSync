@@ -139,7 +139,7 @@ public sealed partial class LyricsView : UserControl
     /// Can optionally set a custom message to appear
     /// </summary>
     /// <param name="msg">custom message</param>
-    private void SetNoLyrics(string? msg)
+    internal void SetNoLyrics(string? msg)
     {
         DispatcherQueue.TryEnqueue(() =>
         {
