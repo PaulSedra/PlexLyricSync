@@ -77,6 +77,7 @@ public sealed partial class MainWindow : Window
     {
         PlexBaseUrl = config.PlexBaseUrl;
         PlexToken = config.PlexToken;
+        LyricsView.SetSyncedLineCount(config.SyncedLyricLines);
 
         _pollCts?.Cancel();
         _plex?.Dispose();
@@ -96,6 +97,7 @@ public sealed partial class MainWindow : Window
         var config = await ConfigLoader.LoadConfigAsync(this);
         PlexBaseUrl = config.PlexBaseUrl;
         PlexToken = config.PlexToken;
+        LyricsView.SetSyncedLineCount(config.SyncedLyricLines);
 
         NowPlaying.Text = "Connecting to Plex";
 

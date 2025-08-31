@@ -15,6 +15,7 @@ public static class ConfigLoader
     {
         public string PlexBaseUrl { get; set; } = "";
         public string PlexToken { get; set; } = "";
+        public int SyncedLyricLines { get; set; } = 3;
     }
 
     private static string GetConfigPath()
@@ -35,7 +36,8 @@ public static class ConfigLoader
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path,
             $"PlexBaseUrl: \"{cfg.PlexBaseUrl}\"{Environment.NewLine}" +
-            $"PlexToken: \"{cfg.PlexToken}\"{Environment.NewLine}");
+            $"PlexToken: \"{cfg.PlexToken}\"{Environment.NewLine}" +
+            $"SyncedLyricLines: {cfg.SyncedLyricLines}{Environment.NewLine}");
     }
 
     public static async Task<Config> LoadConfigAsync(Window window)

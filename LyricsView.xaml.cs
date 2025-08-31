@@ -17,8 +17,11 @@ public sealed partial class LyricsView : UserControl
     internal readonly LyricsClient _lyrics = new();
     internal List<LrcLine>? _lrc;
     internal bool _hasSynced = false;
+    private bool _plainActive = false;
     internal string _trackKey = "";
     internal int _curLyricIdx = -1;
+    private int _scrollOffset = 0;
+    private int _visibleLines = 3;
     internal string? _localPath;
 
     public LyricsView()
@@ -34,6 +37,7 @@ public sealed partial class LyricsView : UserControl
         LyNext3.Tapped += async (_, __) => await SeekToRelativeAsync(+3);
         LySource.Tapped += OnLySourceTapped;
         LyUpdate.Click += OnLyUpdateClicked;
+        SyncedPanel.PointerWheelChanged += OnSyncedScroll;
     }
 
     /// <summary>
@@ -118,6 +122,10 @@ public sealed partial class LyricsView : UserControl
                 if (trackKey != _trackKey) return;
                 _lrc = parsed;
                 _hasSynced = true;
+                _plainActive = false;
+                _scrollOffset = 0;
+                SyncedPanel.Visibility = Visibility.Visible;
+                PlainScroll.Visibility = Visibility.Collapsed;
             });
         }
 
@@ -129,7 +137,11 @@ public sealed partial class LyricsView : UserControl
                 if (trackKey != _trackKey) return;
                 _lrc = null;
                 _hasSynced = false;
-                LyCurr0.Text = lyrics.plain;
+                _plainActive = true;
+                SyncedPanel.Visibility = Visibility.Collapsed;
+                PlainScroll.Visibility = Visibility.Visible;
+                PlainText.Text = lyrics.plain;
+                PlainScroll.ChangeView(null, 0, null);
             });
         }
     }
@@ -145,6 +157,9 @@ public sealed partial class LyricsView : UserControl
         {
             _lrc = null;
             _hasSynced = false;
+            _plainActive = false;
+            SyncedPanel.Visibility = Visibility.Visible;
+            PlainScroll.Visibility = Visibility.Collapsed;
             LyCurr0.Text = msg ?? "No lyrics found.";
             LySource.Text = string.Empty;
             ToolTipService.SetToolTip(LySource, null);
@@ -162,13 +177,20 @@ public sealed partial class LyricsView : UserControl
         if (_hasSynced && _lrc is not null && _lrc.Count > 0)
         {
             var idx = LrcParser.IndexAt(_lrc, TimeSpan.FromMilliseconds(predictedViewOffsetMs));
-            _curLyricIdx = idx;
-            UpdateSyncedLyricStack(idx);
+            if (idx != _curLyricIdx)
+            {
+                _curLyricIdx = idx;
+                _scrollOffset = 0;
+            }
+            UpdateSyncedLyricStack(_curLyricIdx + _scrollOffset);
         }
         else
         {
             _curLyricIdx = -1;
-            UpdateNonSyncedLyricStack(_hasSynced ? "" : LyCurr0.Text ?? "");
+            if (!_plainActive)
+            {
+                UpdateNonSyncedLyricStack(_hasSynced ? "" : LyCurr0.Text ?? "");
+            }
         }
     }
 
@@ -205,16 +227,41 @@ public sealed partial class LyricsView : UserControl
         try
         {
             if (_lrc is null || _lrc.Count == 0) return;
-            int targetIdx = _curLyricIdx + delta;
+            int baseIdx = _curLyricIdx + _scrollOffset;
+            int targetIdx = baseIdx + delta;
             if (targetIdx < 0 || targetIdx >= _lrc.Count) return;
 
             int targetMs = (int)_lrc[targetIdx].T.TotalMilliseconds;
             _curLyricIdx = targetIdx;
+            _scrollOffset = 0;
             UpdateSyncedLyricStack(_curLyricIdx);
 
             if (MainWindow is not null) await MainWindow.SeekToMsAsync(targetMs);
         }
         catch { }
+    }
+
+    private void OnSyncedScroll(object sender, PointerRoutedEventArgs e)
+    {
+        if (_lrc is null || _lrc.Count == 0) return;
+        int delta = e.GetCurrentPoint(SyncedPanel).Properties.MouseWheelDelta;
+        int dir = delta > 0 ? -1 : 1;
+        int maxUp = -_curLyricIdx;
+        int maxDown = _lrc.Count - 1 - _curLyricIdx;
+        _scrollOffset = Math.Clamp(_scrollOffset + dir, maxUp, maxDown);
+        UpdateSyncedLyricStack(_curLyricIdx + _scrollOffset);
+        e.Handled = true;
+    }
+
+    internal void SetSyncedLineCount(int lines)
+    {
+        _visibleLines = Math.Clamp(lines, 0, 3);
+        LyPrev3.Visibility = _visibleLines >= 3 ? Visibility.Visible : Visibility.Collapsed;
+        LyPrev2.Visibility = _visibleLines >= 2 ? Visibility.Visible : Visibility.Collapsed;
+        LyPrev1.Visibility = _visibleLines >= 1 ? Visibility.Visible : Visibility.Collapsed;
+        LyNext1.Visibility = _visibleLines >= 1 ? Visibility.Visible : Visibility.Collapsed;
+        LyNext2.Visibility = _visibleLines >= 2 ? Visibility.Visible : Visibility.Collapsed;
+        LyNext3.Visibility = _visibleLines >= 3 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     /// <summary>
