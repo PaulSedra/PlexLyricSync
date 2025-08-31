@@ -135,11 +135,10 @@ public sealed partial class LyricsView : UserControl
     }
 
     /// <summary>
-    /// Updates UI lyrics when there are no lyrics.
-    /// Can optionally set a custom message to appear
+    /// Updates the lyric display with a message when no lyrics or data are available.
     /// </summary>
-    /// <param name="msg">custom message</param>
-    private void SetNoLyrics(string? msg)
+    /// <param name="msg">Message to display.</param>
+    internal void SetNoLyrics(string? msg)
     {
         DispatcherQueue.TryEnqueue(() =>
         {

@@ -119,6 +119,11 @@ public sealed partial class PlayerControls : UserControl
         await SeekFromPointerAsync(progressBar, pointerEvent);
     }
 
+    private void SettingsButton_Click(object sender, RoutedEventArgs e)
+    {
+        MainWindow?.OpenSettings();
+    }
+
     private async void PlayPauseButton_Click(object sender, RoutedEventArgs e)
     {
         var mainWindow = MainWindow;
