@@ -27,6 +27,7 @@ public sealed partial class SettingsPage : Page
         _loading = true;
         PlexUrlBox.Text = _cfg.PlexBaseUrl;
         PlexTokenBox.Text = _cfg.PlexToken;
+        SyncedLinesBox.Value = _cfg.SyncedLyricLines;
         _loading = false;
 
         NavTabs.SelectedIndex = 0;
@@ -50,6 +51,17 @@ public sealed partial class SettingsPage : Page
         if (_mainWindow is null) return;
         if (string.IsNullOrWhiteSpace(_cfg.PlexBaseUrl) || string.IsNullOrWhiteSpace(_cfg.PlexToken)) return;
         await _mainWindow.UpdateConfigAsync(_cfg);
+    }
+
+    private void SyncedLinesChanged(NumberBox sender, NumberBoxValueChangedEventArgs args)
+    {
+        if (_loading || _mainWindow is null) return;
+
+        _cfg.SyncedLyricLines = (int)sender.Value;
+        ConfigLoader.SaveConfig(_cfg);
+
+        _debounceTimer.Stop();
+        _debounceTimer.Start();
     }
 
     private void BackButton_Click(object sender, RoutedEventArgs e)

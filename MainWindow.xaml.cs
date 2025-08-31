@@ -15,6 +15,7 @@ public sealed partial class MainWindow : Window
 
     internal string PlexBaseUrl = "";
     internal string PlexToken = "";
+    internal int SyncedLyricLines = 3;
 
     internal PlexApiClient? _plex;
     internal string _clientId = "";       // Plex player's machineIdentifier
@@ -77,6 +78,8 @@ public sealed partial class MainWindow : Window
     {
         PlexBaseUrl = cfg.PlexBaseUrl;
         PlexToken = cfg.PlexToken;
+        SyncedLyricLines = cfg.SyncedLyricLines;
+        LyricsView.SetSyncedLineCount(SyncedLyricLines);
 
         _pollCts?.Cancel();
         _plex?.Dispose();
@@ -96,6 +99,8 @@ public sealed partial class MainWindow : Window
         var config = await ConfigLoader.LoadConfigAsync(this);
         PlexBaseUrl = config.PlexBaseUrl;
         PlexToken = config.PlexToken;
+        SyncedLyricLines = config.SyncedLyricLines;
+        LyricsView.SetSyncedLineCount(SyncedLyricLines);
 
         NowPlaying.Text = "Connecting to Plex";
 
