@@ -18,6 +18,12 @@
             <StackPanel x:Name="PlexPanel" Spacing="12">
                 <TextBox x:Name="PlexUrlBox" Header="Plex URL" TextChanged="SettingChanged"/>
                 <TextBox x:Name="PlexTokenBox" Header="Plex Token" TextChanged="SettingChanged"/>
+                <NumberBox x:Name="SyncedLinesBox"
+                           Header="Synced lyric lines"
+                           Minimum="0"
+                           SpinButtonPlacementMode="Inline"
+                           SmallChange="1"
+                           ValueChanged="SyncedLinesChanged"/>
                 <Button Content="Back" HorizontalAlignment="Right" Click="BackButton_Click"/>
             </StackPanel>
         </Grid>

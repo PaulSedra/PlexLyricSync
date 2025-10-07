@@ -7,6 +7,9 @@ using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Text;
+using Microsoft.UI.Xaml.Media;
+using Microsoft.UI;
 
 namespace PlexLyricSync;
 
@@ -17,24 +20,48 @@ public sealed partial class LyricsView : UserControl
     internal readonly LyricsClient _lyrics = new();
     internal List<LrcLine>? _lrc;
     internal bool _hasSynced = false;
+    private bool _plainActive = false;
     internal string _trackKey = "";
     internal int _curLyricIdx = -1;
+    private int _scrollOffset = 0;
+    private int _visibleLines = 3;
     internal string? _localPath;
+    private readonly List<TextBlock> _syncedBlocks = new();
 
     public LyricsView()
     {
         this.InitializeComponent();
 
-        LyPrev3.Tapped += async (_, __) => await SeekToRelativeAsync(-3);
-        LyPrev2.Tapped += async (_, __) => await SeekToRelativeAsync(-2);
-        LyPrev1.Tapped += async (_, __) => await SeekToRelativeAsync(-1);
-        LyCurr0.Tapped += async (_, __) => await SeekToRelativeAsync(0);
-        LyNext1.Tapped += async (_, __) => await SeekToRelativeAsync(+1);
-        LyNext2.Tapped += async (_, __) => await SeekToRelativeAsync(+2);
-        LyNext3.Tapped += async (_, __) => await SeekToRelativeAsync(+3);
         LySource.Tapped += OnLySourceTapped;
         LyUpdate.Click += OnLyUpdateClicked;
+        SyncedPanel.PointerWheelChanged += OnSyncedScroll;
+
+        SetSyncedLineCount(_visibleLines);
     }
+
+    private void RebuildSyncedBlocks()
+    {
+        SyncedPanel.Children.Clear();
+        _syncedBlocks.Clear();
+
+        for (int i = -_visibleLines; i <= _visibleLines; i++)
+        {
+            var tb = new TextBlock
+            {
+                Foreground = new SolidColorBrush(Colors.White),
+                TextWrapping = TextWrapping.WrapWholeWords,
+                TextAlignment = TextAlignment.Center
+            };
+            int rel = i;
+            tb.Tapped += async (_, __) => await SeekToRelativeAsync(rel);
+            _syncedBlocks.Add(tb);
+            SyncedPanel.Children.Add(tb);
+        }
+    }
+
+    private static double SizeFor(int dist) => Math.Max(22 - 2 * dist, 12);
+
+    private static double OpacityFor(int dist) => dist == 0 ? 1.0 : Math.Max(0.8 - 0.25 * (dist - 1), 0.35);
 
     /// <summary>
     /// Gets local and remote lyrics. Prioritizes displaying local lyrics.
@@ -43,9 +70,10 @@ public sealed partial class LyricsView : UserControl
     /// <param name="artist">track artist</param>
     /// <param name="album">track album</param>
     /// <param name="title">track title</param>
+    /// <param name="duration">track duration</param>
     /// <param name="trackKey">track trackKey</param>
     /// <param name="ct">cancellation token</param>
-    public async Task FetchLyricsAsync(string artist, string album, string title, string trackKey, CancellationToken ct)
+    public async Task FetchLyricsAsync(string artist, string album, string title, int duration, string trackKey, CancellationToken ct)
     {
         _trackKey = trackKey;
         LyUpdate.Visibility = Visibility.Collapsed;
@@ -64,7 +92,7 @@ public sealed partial class LyricsView : UserControl
 
         try
         {
-            var remote = await _lyrics.GetRemoteAsync(title, artist, album, ct);  // get remote lyrics
+            var remote = await _lyrics.GetRemoteAsync(artist, album, title, duration, ct);  // get remote lyrics
             if (local is null)
             {
                 if (remote is not null) SetLyrics(trackKey, remote, false);       // remote lyrics found
@@ -82,10 +110,6 @@ public sealed partial class LyricsView : UserControl
         }
         catch
         {
-            // Known errors:
-            // Exception thrown: 'System.Threading.Tasks.TaskCanceledException' in System.Private.CoreLib.dll
-            // This maybe happening because something goes wrong in _lyrics.GetRemoteAsync or the method is called twice?
-
             if (_lrc is null) SetNoLyrics("An error occurred while searching for lyrics.");
         }
     }
@@ -118,6 +142,11 @@ public sealed partial class LyricsView : UserControl
                 if (trackKey != _trackKey) return;
                 _lrc = parsed;
                 _hasSynced = true;
+                _plainActive = false;
+                _scrollOffset = 0;
+                SyncedPanel.Visibility = Visibility.Visible;
+                PlainScroll.Visibility = Visibility.Collapsed;
+                UpdateSyncedLyricStack(0);
             });
         }
 
@@ -129,7 +158,11 @@ public sealed partial class LyricsView : UserControl
                 if (trackKey != _trackKey) return;
                 _lrc = null;
                 _hasSynced = false;
-                LyCurr0.Text = lyrics.plain;
+                _plainActive = true;
+                SyncedPanel.Visibility = Visibility.Collapsed;
+                PlainScroll.Visibility = Visibility.Visible;
+                PlainText.Text = lyrics.plain;
+                PlainScroll.ChangeView(null, 0, null);
             });
         }
     }
@@ -145,7 +178,11 @@ public sealed partial class LyricsView : UserControl
         {
             _lrc = null;
             _hasSynced = false;
-            LyCurr0.Text = msg ?? "No lyrics found.";
+            _plainActive = false;
+            SyncedPanel.Visibility = Visibility.Visible;
+            PlainScroll.Visibility = Visibility.Collapsed;
+            if (_syncedBlocks.Count == 0) SetSyncedLineCount(_visibleLines);
+            _syncedBlocks[_visibleLines].Text = msg ?? "No lyrics found.";
             LySource.Text = string.Empty;
             ToolTipService.SetToolTip(LySource, null);
             _localPath = null;
@@ -162,42 +199,76 @@ public sealed partial class LyricsView : UserControl
         if (_hasSynced && _lrc is not null && _lrc.Count > 0)
         {
             var idx = LrcParser.IndexAt(_lrc, TimeSpan.FromMilliseconds(predictedViewOffsetMs));
-            _curLyricIdx = idx;
-            UpdateSyncedLyricStack(idx);
+            if (idx != _curLyricIdx)
+            {
+                _curLyricIdx = idx;
+                _scrollOffset = 0;
+            }
+            UpdateSyncedLyricStack(_curLyricIdx + _scrollOffset);
         }
         else
         {
             _curLyricIdx = -1;
-            UpdateNonSyncedLyricStack(_hasSynced ? "" : LyCurr0.Text ?? "");
+            if (!_plainActive)
+            {
+                var cur = _syncedBlocks.Count > _visibleLines ? _syncedBlocks[_visibleLines].Text : "";
+                UpdateNonSyncedLyricStack(_hasSynced ? "" : cur);
+            }
         }
     }
 
     /// <summary>
-    /// Updates the lyric stack when synced lyrics exist. It displays the current lyric line on LyCurr0 as well as the previous 3 and next 3 lines.
+    /// Updates the lyric stack when synced lyrics exist. It displays the current lyric line along with surrounding lines.
     /// </summary>
     /// <param name="idx">the current lyric index</param>
     internal void UpdateSyncedLyricStack(int idx)
     {
         string L(int i) => (_lrc is not null && i >= 0 && i < _lrc.Count) ? _lrc[i].Text : string.Empty;
 
-        LyPrev3.Text = L(idx - 3);
-        LyPrev2.Text = L(idx - 2);
-        LyPrev1.Text = L(idx - 1);
-        LyCurr0.Text = L(idx);
-        LyNext1.Text = L(idx + 1);
-        LyNext2.Text = L(idx + 2);
-        LyNext3.Text = L(idx + 3);
+        for (int i = -_visibleLines; i <= _visibleLines; i++)
+        {
+            int idxBlock = i + _visibleLines;
+            var tb = _syncedBlocks[idxBlock];
+            tb.Text = L(idx + i);
+            int dist = Math.Abs(i);
+            tb.FontSize = SizeFor(dist);
+            tb.Opacity = OpacityFor(dist);
+            tb.FontWeight = FontWeights.Normal;
+        }
+
+        int curPos = _curLyricIdx - idx;
+        if (curPos >= -_visibleLines && curPos <= _visibleLines)
+        {
+            var highlight = _syncedBlocks[curPos + _visibleLines];
+            highlight.FontSize = 22;
+            highlight.Opacity = 1.0;
+            highlight.FontWeight = FontWeights.SemiBold;
+        }
     }
 
     /// <summary>
-    /// Updates the lyric stack when no synced lyrics exist. It displays the lyrics on LyCurr0.
+    /// Updates the lyric stack when no synced lyrics exist. It displays the lyrics on the center line.
     /// </summary>
     /// <param name="lyrics">lyrics to use</param>
     private void UpdateNonSyncedLyricStack(string lyrics)
     {
-        LyPrev3.Text = LyPrev2.Text = LyPrev1.Text =
-        LyNext1.Text = LyNext2.Text = LyNext3.Text = string.Empty;
-        LyCurr0.Text = lyrics;
+        for (int i = 0; i < _syncedBlocks.Count; i++)
+        {
+            var tb = _syncedBlocks[i];
+            tb.Text = string.Empty;
+            int dist = Math.Abs(i - _visibleLines);
+            tb.FontSize = SizeFor(dist);
+            tb.Opacity = OpacityFor(dist);
+            tb.FontWeight = FontWeights.Normal;
+        }
+        if (_syncedBlocks.Count > _visibleLines)
+        {
+            var center = _syncedBlocks[_visibleLines];
+            center.Text = lyrics;
+            center.FontSize = 22;
+            center.Opacity = 1.0;
+            center.FontWeight = FontWeights.SemiBold;
+        }
     }
 
     private async Task SeekToRelativeAsync(int delta)
@@ -205,16 +276,41 @@ public sealed partial class LyricsView : UserControl
         try
         {
             if (_lrc is null || _lrc.Count == 0) return;
-            int targetIdx = _curLyricIdx + delta;
+            int baseIdx = _curLyricIdx + _scrollOffset;
+            int targetIdx = baseIdx + delta;
             if (targetIdx < 0 || targetIdx >= _lrc.Count) return;
 
             int targetMs = (int)_lrc[targetIdx].T.TotalMilliseconds;
             _curLyricIdx = targetIdx;
+            _scrollOffset = 0;
             UpdateSyncedLyricStack(_curLyricIdx);
 
             if (MainWindow is not null) await MainWindow.SeekToMsAsync(targetMs);
         }
         catch { }
+    }
+
+    private void OnSyncedScroll(object sender, PointerRoutedEventArgs e)
+    {
+        if (_lrc is null || _lrc.Count == 0) return;
+        int delta = e.GetCurrentPoint(SyncedPanel).Properties.MouseWheelDelta;
+        int dir = delta > 0 ? -1 : 1;
+        int maxUp = -_curLyricIdx;
+        int maxDown = _lrc.Count - 1 - _curLyricIdx;
+        _scrollOffset = Math.Clamp(_scrollOffset + dir, maxUp, maxDown);
+        UpdateSyncedLyricStack(_curLyricIdx + _scrollOffset);
+        e.Handled = true;
+    }
+
+    internal void SetSyncedLineCount(int lines)
+    {
+        _visibleLines = Math.Max(0, lines);
+        RebuildSyncedBlocks();
+
+        if (_hasSynced && _lrc is not null)
+            UpdateSyncedLyricStack(_curLyricIdx + _scrollOffset);
+        else
+            UpdateNonSyncedLyricStack(_syncedBlocks.Count > _visibleLines ? _syncedBlocks[_visibleLines].Text : "");
     }
 
     /// <summary>

@@ -18,7 +18,7 @@ public sealed partial class MainWindow : Window
 
     internal PlexApiClient? _plex;
     internal string _clientId = "";       // Plex player's machineIdentifier
-    private CancellationTokenSource? _pollCts;
+    internal CancellationTokenSource? _pollCts;
 
     // latest plex metadata
     private string _artist = "", _album = "", _title = "", _albumArtUrl = "";
@@ -31,7 +31,7 @@ public sealed partial class MainWindow : Window
     internal DateTime _predictedViewOffsetUtc = DateTime.UtcNow;
 
     // Display clock (predicted position between server ticks)
-    private readonly DispatcherTimer _uiTimer = new() { Interval = TimeSpan.FromMilliseconds(200) };
+    internal readonly DispatcherTimer _uiTimer = new() { Interval = TimeSpan.FromMilliseconds(200) };
 
     public MainWindow()
     {
@@ -73,37 +73,24 @@ public sealed partial class MainWindow : Window
         Root.Visibility = Visibility.Visible;
     }
 
-    internal async Task UpdateConfigAsync(ConfigLoader.Config config)
-    {
-        PlexBaseUrl = config.PlexBaseUrl;
-        PlexToken = config.PlexToken;
-
-        _pollCts?.Cancel();
-        _plex?.Dispose();
-        _pollCts = null;
-
-        NowPlaying.Text = "Connecting to Plex";
-
-        await InitAsync();
-    }
-
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
         // Ensure this only runs once
         ((FrameworkElement)sender).Loaded -= MainWindow_Loaded;
 
-        // plex url and token from config file
-        var config = await ConfigLoader.LoadConfigAsync(this);
-        PlexBaseUrl = config.PlexBaseUrl;
-        PlexToken = config.PlexToken;
-
         NowPlaying.Text = "Connecting to Plex";
 
         await InitAsync();
     }
 
-    private async Task InitAsync()
+    internal async Task InitAsync()
     {
+        // plex url and token from config file
+        var config = await ConfigLoader.LoadConfigAsync(this);
+        PlexBaseUrl = config.PlexBaseUrl;
+        PlexToken = config.PlexToken;
+        LyricsView.SetSyncedLineCount(config.SyncedLyricLines);
+
         _plex = new PlexApiClient(PlexBaseUrl, PlexToken);
 
         // Start UI prediction (keeps the bar moving smoothly between Plex updates)
@@ -143,6 +130,7 @@ public sealed partial class MainWindow : Window
                 _predictedViewOffsetUtc = now;
 
                 LyricsView._lrc = null;
+                LyricsView.SetNoLyrics("");
 
                 DispatcherQueue.TryEnqueue(UpdateTrackInformation);
                 return;
@@ -178,7 +166,7 @@ public sealed partial class MainWindow : Window
             {
                 var trackKey = $"{_artist}|{_album}|{_title}|{_durationMs}";
                 DispatcherQueue.TryEnqueue(UpdateTrackInformation);
-                await LyricsView.FetchLyricsAsync(_artist, _album, _title, trackKey, ct).ConfigureAwait(false);
+                await LyricsView.FetchLyricsAsync(_artist, _album, _title, _durationMs/1000, trackKey, ct).ConfigureAwait(false);
             }
         }
         catch

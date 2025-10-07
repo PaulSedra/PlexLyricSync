@@ -11,7 +11,7 @@ public sealed class LyricsClient : IDisposable
 {
     public record LyricsData(string? syncedLrc, string? plain, string? path);
 
-    private readonly HttpClient _http = new() { Timeout = TimeSpan.FromSeconds(3) };
+    private readonly HttpClient _http = new();
 
     /// <summary>
     /// Checks if string is a valid folder/file name and replaces invalid characters with "_".
@@ -75,12 +75,13 @@ public sealed class LyricsClient : IDisposable
     /// <summary>
     /// Grabs lyrics from lrclib.net.
     /// </summary>
-    /// <param name="title">track title</param>
     /// <param name="artist">track artist</param>
     /// <param name="album">track album</param>
+    /// <param name="title">track title</param>
+    /// <param name="duration">track duration</param>
     /// <param name="ct">cancellation token</param>
     /// <returns>LyricsData (optional): lyrics if found</returns>
-    public async Task<LyricsData?> GetRemoteAsync(string title, string artist, string album, CancellationToken ct)
+    public async Task<LyricsData?> GetRemoteAsync(string artist, string album, string title, int duration, CancellationToken ct)
     {
         // file path
         var directory = GetLyricsDirectory(artist, album);
@@ -88,7 +89,7 @@ public sealed class LyricsClient : IDisposable
         var txtPath = Path.Combine(directory, Sanitize(title) + ".txt");
 
         // grab lyrics from lrclib.net
-        var url = $"https://lrclib.net/api/get?track_name={Uri.EscapeDataString(title)}&artist_name={Uri.EscapeDataString(artist)}";
+        var url = $"https://lrclib.net/api/get?artist_name={Uri.EscapeDataString(artist)}&album_name={Uri.EscapeDataString(album)}&track_name={Uri.EscapeDataString(title)}&duration={Uri.EscapeDataString(duration.ToString())}";
         var resp = await _http.GetAsync(url, ct);
         if (!resp.IsSuccessStatusCode) return null;
 

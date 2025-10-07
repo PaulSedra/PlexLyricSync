@@ -15,14 +15,11 @@
             <TextBlock x:Name="LySource" VerticalAlignment="Top" FontSize="12" Foreground="White" Opacity="0.7"/>
         </StackPanel>
 
-        <StackPanel Grid.Row="0" VerticalAlignment="Center" Margin="0 -61 0 0" Spacing="2">
-            <TextBlock x:Name="LyPrev3" FontSize="16" Foreground="White" Opacity="0.35" TextWrapping="WrapWholeWords" TextAlignment="Center"/>
-            <TextBlock x:Name="LyPrev2" FontSize="18" Foreground="White" Opacity="0.45" TextWrapping="WrapWholeWords" TextAlignment="Center"/>
-            <TextBlock x:Name="LyPrev1" FontSize="20" Foreground="White" Opacity="0.65" TextWrapping="WrapWholeWords" TextAlignment="Center"/>
-            <TextBlock x:Name="LyCurr0" FontSize="28" Foreground="White" TextWrapping="WrapWholeWords" TextAlignment="Center" FontWeight="SemiBold"/>
-            <TextBlock x:Name="LyNext1" FontSize="22" Foreground="White" Opacity="0.80" TextWrapping="WrapWholeWords" TextAlignment="Center"/>
-            <TextBlock x:Name="LyNext2" FontSize="18" Foreground="White" Opacity="0.55" TextWrapping="WrapWholeWords" TextAlignment="Center"/>
-            <TextBlock x:Name="LyNext3" FontSize="16" Foreground="White" Opacity="0.35" TextWrapping="WrapWholeWords" TextAlignment="Center"/>
-        </StackPanel>
+        <Grid Grid.Row="0" Margin="0 20 0 80">
+            <StackPanel x:Name="SyncedPanel" VerticalAlignment="Center" Spacing="2"/>
+            <ScrollViewer x:Name="PlainScroll" Visibility="Collapsed" VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
+                <TextBlock x:Name="PlainText" FontSize="20" Foreground="White" Opacity="0.80" TextWrapping="WrapWholeWords" TextAlignment="Left"/>
+            </ScrollViewer>
+        </Grid>
     </Grid>
 </UserControl>

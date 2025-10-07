@@ -30,15 +30,13 @@
                     <TextBlock
                         x:Name="ArtistBlock"
                         FontSize="14"
-                        Text="{x:Bind NowPlaying.Text, Mode=OneWay}"
-                    />
+                        Text=""/>
                     <TextBlock
                         x:Name="NowPlaying"
                         FontSize="18"
                         Foreground="White"
                         Text="Waiting for playback…"
-                        TextWrapping="WrapWholeWords"
-                    />
+                        TextWrapping="WrapWholeWords"/>
                 </StackPanel>
 
                 <Grid Grid.Row="1">
