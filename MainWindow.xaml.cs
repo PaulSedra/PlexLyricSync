@@ -17,6 +17,7 @@ public sealed partial class MainWindow : Window
     internal string PlexToken = "";
 
     internal PlexApiClient? _plex;
+    internal string _clientUrl = "";      // Plex player's machineIdentifier
     internal string _clientId = "";       // Plex player's machineIdentifier
     internal CancellationTokenSource? _pollCts;
 
@@ -137,6 +138,7 @@ public sealed partial class MainWindow : Window
             }
 
             // Capture client id for control (seek)
+            _clientUrl = "http://" + np.ClientUrl + ":32500" ?? _clientId;
             _clientId = np.ClientId ?? _clientId;
 
             // change detection
@@ -212,10 +214,10 @@ public sealed partial class MainWindow : Window
     {
         try
         {
-            if (_plex is null || string.IsNullOrWhiteSpace(_clientId)) return;
+            if (_plex is null || string.IsNullOrWhiteSpace(_clientUrl) || string.IsNullOrWhiteSpace(_clientId)) return;
 
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1.5));
-            var ok = await _plex.SeekToAsync(_clientId, targetMs, cts.Token);
+            var ok = await _plex.SeekToAsync(_clientUrl, _clientId, targetMs, cts.Token);
             if (!ok) return;
 
             _predictedViewOffsetMs = targetMs;

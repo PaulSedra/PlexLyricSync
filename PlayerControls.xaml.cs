@@ -39,7 +39,7 @@ public sealed partial class PlayerControls : UserControl
         if (mainWindow is null) return;
         try
         {
-            if (mainWindow._plex is null || string.IsNullOrWhiteSpace(mainWindow._clientId)) return;
+            if (mainWindow._plex is null || string.IsNullOrWhiteSpace(mainWindow._clientUrl) || string.IsNullOrWhiteSpace(mainWindow._clientId)) return;
             if (mainWindow._durationMs <= 0) return;
 
             double x = pointerEvent.GetCurrentPoint(progressBar).Position.X;
@@ -50,7 +50,7 @@ public sealed partial class PlayerControls : UserControl
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1.5));
             if (!_isSeeking)
             {
-                var ok = await mainWindow._plex.SeekToAsync(mainWindow._clientId, targetMs, cts.Token);
+                var ok = await mainWindow._plex.SeekToAsync(mainWindow._clientUrl, mainWindow._clientId, targetMs, cts.Token);
                 if (!ok) return;
             }
 
@@ -130,20 +130,20 @@ public sealed partial class PlayerControls : UserControl
         if (mainWindow is null) return;
         try
         {
-            if (mainWindow._plex is null || string.IsNullOrWhiteSpace(mainWindow._clientId)) return;
+            if (mainWindow._plex is null || string.IsNullOrWhiteSpace(mainWindow._clientUrl) || string.IsNullOrWhiteSpace(mainWindow._clientId)) return;
 
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1.5));
             bool ok;
             if (mainWindow._state.Equals("playing", StringComparison.OrdinalIgnoreCase))
             {
                 mainWindow.ForecastTrackProgress();
-                ok = await mainWindow._plex.PauseAsync(mainWindow._clientId, cts.Token);
+                ok = await mainWindow._plex.PauseAsync(mainWindow._clientUrl, mainWindow._clientId, cts.Token);
                 if (!ok) return;
                 mainWindow._state = "paused";
             }
             else
             {
-                ok = await mainWindow._plex.PlayAsync(mainWindow._clientId, cts.Token);
+                ok = await mainWindow._plex.PlayAsync(mainWindow._clientUrl, mainWindow._clientId, cts.Token);
                 if (!ok) return;
                 mainWindow._state = "playing";
                 mainWindow._predictedViewOffsetUtc = DateTime.UtcNow;
@@ -173,12 +173,12 @@ public sealed partial class PlayerControls : UserControl
         if (mainWindow is null) return;
         try
         {
-            if (mainWindow._plex is null || string.IsNullOrWhiteSpace(mainWindow._clientId)) return;
+            if (mainWindow._plex is null || string.IsNullOrWhiteSpace(mainWindow._clientUrl) || string.IsNullOrWhiteSpace(mainWindow._clientId)) return;
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1.5));
             if (forward)
-                await mainWindow._plex.SkipNextAsync(mainWindow._clientId, cts.Token);
+                await mainWindow._plex.SkipNextAsync(mainWindow._clientUrl, mainWindow._clientId, cts.Token);
             else
-                await mainWindow._plex.SkipPreviousAsync(mainWindow._clientId, cts.Token);
+                await mainWindow._plex.SkipPreviousAsync(mainWindow._clientUrl, mainWindow._clientId, cts.Token);
         }
         catch
         { }

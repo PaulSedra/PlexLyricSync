@@ -14,6 +14,7 @@ public record PlexNowPlayingResult(
     int ViewOffsetMs,
     int DurationMs,
     string State,
+    string ClientUrl,
     string ClientId,
     string AlbumArtUrl
 );
@@ -78,6 +79,7 @@ public sealed class PlexApiClient : IDisposable
             offset = int.TryParse(tr.Attribute("viewOffset")?.Value, out var o) ? o : 0;
 
         string state = plexamp.State;
+        string clientUrl = player?.Attribute("address")?.Value ?? "";
         string clientId = player?.Attribute("machineIdentifier")?.Value ?? "";
 
         // album art
@@ -91,23 +93,24 @@ public sealed class PlexApiClient : IDisposable
         if (string.IsNullOrWhiteSpace(artist) && string.IsNullOrWhiteSpace(title))
             return null;
 
-        return new PlexNowPlayingResult(artist, album, title, offset, duration, state, clientId, artUrl);
+        return new PlexNowPlayingResult(artist, album, title, offset, duration, state, clientUrl, clientId, artUrl);
     }
 
     /// <summary>
     /// Asynchronously seeks plexamp player to specified offset.
     /// </summary>
+    /// <param name="clientUrl">url of player client to control</param>
     /// <param name="clientId">id of player client to control</param>
     /// <param name="offsetMs">position to seek to</param>
     /// <param name="ct">cancellation token</param>
     /// <returns></returns>
-    public async Task<bool> SeekToAsync(string clientId, int offsetMs, CancellationToken ct)
+    public async Task<bool> SeekToAsync(string clientUrl, string clientId, int offsetMs, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(clientId)) return false;
         if (offsetMs < 0) offsetMs = 0;
 
-        using var req = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/player/playback/seekTo?offset={offsetMs}");
-        req.Headers.TryAddWithoutValidation("X-Plex-Target-Client-Identifier", clientId);
+        using var req = new HttpRequestMessage(HttpMethod.Get, $"{clientUrl}/player/playback/seekTo?offset={offsetMs}");
+        req.Headers.TryAddWithoutValidation("X-Plex-Client-Identifier", clientId);
         req.Headers.TryAddWithoutValidation("Cache-Control", "no-cache");
 
         var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
@@ -117,43 +120,48 @@ public sealed class PlexApiClient : IDisposable
     /// <summary>
     /// Sends a pause command to the specified Plex client.
     /// </summary>
+    /// <param name="clientUrl">id of player client to control</param>
     /// <param name="clientId">id of player client to control</param>
     /// <param name="ct">cancellation token</param>
-    public Task<bool> PauseAsync(string clientId, CancellationToken ct) => SendPlaybackCommandAsync(clientId, "pause", ct);
+    public Task<bool> PauseAsync(string clientUrl, string clientId, CancellationToken ct) => SendPlaybackCommandAsync(clientUrl, clientId, "pause", ct);
 
     /// <summary>
     /// Sends a play command to the specified Plex client.
     /// </summary>
+    /// <param name="clientUrl">id of player client to control</param>
     /// <param name="clientId">id of player client to control</param>
     /// <param name="ct">cancellation token</param>
-    public Task<bool> PlayAsync(string clientId, CancellationToken ct) => SendPlaybackCommandAsync(clientId, "play", ct);
+    public Task<bool> PlayAsync(string clientUrl, string clientId, CancellationToken ct) => SendPlaybackCommandAsync(clientUrl, clientId, "play", ct);
 
     /// <summary>
     /// Sends a skipNext command to the specified Plex client.
     /// </summary>
+    /// <param name="clientUrl">id of player client to control</param>
     /// <param name="clientId">id of player client to control</param>
     /// <param name="ct">cancellation token</param>
-    public Task<bool> SkipNextAsync(string clientId, CancellationToken ct) => SendPlaybackCommandAsync(clientId, "skipNext", ct);
+    public Task<bool> SkipNextAsync(string clientUrl, string clientId, CancellationToken ct) => SendPlaybackCommandAsync(clientUrl, clientId, "skipNext", ct);
 
     /// <summary>
     /// Send a skipPrevious command to the specified Plex client.
     /// </summary>
+    /// <param name="clientUrl">id of player client to control</param>
     /// <param name="clientId">id of player client to control</param>
     /// <param name="ct">cancellation token</param>
-    public Task<bool> SkipPreviousAsync(string clientId, CancellationToken ct) => SendPlaybackCommandAsync(clientId, "skipPrevious", ct);
+    public Task<bool> SkipPreviousAsync(string clientUrl, string clientId, CancellationToken ct) => SendPlaybackCommandAsync(clientUrl, clientId, "skipPrevious", ct);
 
     /// <summary>
     /// Sends a playback command (play/pause/skipNext/skipPrevious) to the specified Plex client.
     /// </summary>
+    /// <param name="clientUrl">id of player client to control</param>
     /// <param name="clientId">id of player client to control</param>
     /// <param name="command"></param>
     /// <param name="ct">cancellation token</param>
-    private async Task<bool> SendPlaybackCommandAsync(string clientId, string command, CancellationToken ct)
+    private async Task<bool> SendPlaybackCommandAsync(string clientUrl, string clientId, string command, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(clientId)) return false;
 
-        using var req = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/player/playback/{command}");
-        req.Headers.TryAddWithoutValidation("X-Plex-Target-Client-Identifier", clientId);
+        using var req = new HttpRequestMessage(HttpMethod.Get, $"{clientUrl}/player/playback/{command}");
+        req.Headers.TryAddWithoutValidation("X-Plex-Client-Identifier", clientId);
         req.Headers.TryAddWithoutValidation("Cache-Control", "no-cache");
 
         var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
