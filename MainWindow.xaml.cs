@@ -91,6 +91,9 @@ public sealed partial class MainWindow : Window
         PlexBaseUrl = config.PlexBaseUrl;
         PlexToken = config.PlexToken;
         LyricsView.SetSyncedLineCount(config.SyncedLyricLines);
+        LyricsView.SetTranslationEnabled(config.EnableTranslations);
+        LyricsView.SetShowTranslations(config.SyncedLyricLines == 0 && config.ShowTranslations);
+        LyricsView.SetPreferredLanguage(config.PreferredLanguage);
 
         _plex = new PlexApiClient(PlexBaseUrl, PlexToken);
 
@@ -169,6 +172,7 @@ public sealed partial class MainWindow : Window
                 var trackKey = $"{_artist}|{_album}|{_title}|{_durationMs}";
                 DispatcherQueue.TryEnqueue(UpdateTrackInformation);
                 await LyricsView.FetchLyricsAsync(_artist, _album, _title, _durationMs/1000, trackKey, ct).ConfigureAwait(false);
+                await LyricsView.FetchTranslatedLyricsAsync(_artist, _album, _title, trackKey, ct).ConfigureAwait(false);
             }
         }
         catch

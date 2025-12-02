@@ -21,7 +21,7 @@ public record PlexNowPlayingResult(
 
 public sealed class PlexApiClient : IDisposable
 {
-    private readonly HttpClient _http;
+    private static readonly HttpClient _http = Http.Client;
     private readonly string _baseUrl;
     private readonly string _token;
 
@@ -29,15 +29,12 @@ public sealed class PlexApiClient : IDisposable
     {
         _baseUrl = plexBaseUrl.TrimEnd('/');
         _token = plexToken;
-        _http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
-        _http.DefaultRequestHeaders.TryAddWithoutValidation("X-Plex-Token", plexToken);
-        _http.DefaultRequestHeaders.TryAddWithoutValidation("Cache-Control", "no-cache");
-        _http.DefaultRequestHeaders.TryAddWithoutValidation("Pragma", "no-cache");
     }
 
     public async Task<PlexNowPlayingResult?> GetPlexampNowPlayingAsync(CancellationToken ct)
     {
         using var req = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/status/sessions");
+        req.Headers.TryAddWithoutValidation("X-Plex-Token", _token);
         req.Headers.TryAddWithoutValidation("Cache-Control", "no-cache");
 
         var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
@@ -110,6 +107,7 @@ public sealed class PlexApiClient : IDisposable
         if (offsetMs < 0) offsetMs = 0;
 
         using var req = new HttpRequestMessage(HttpMethod.Get, $"{clientUrl}/player/playback/seekTo?offset={offsetMs}");
+        req.Headers.TryAddWithoutValidation("X-Plex-Token", _token);
         req.Headers.TryAddWithoutValidation("X-Plex-Client-Identifier", clientId);
         req.Headers.TryAddWithoutValidation("Cache-Control", "no-cache");
 
@@ -161,6 +159,7 @@ public sealed class PlexApiClient : IDisposable
         if (string.IsNullOrWhiteSpace(clientId)) return false;
 
         using var req = new HttpRequestMessage(HttpMethod.Get, $"{clientUrl}/player/playback/{command}");
+        req.Headers.TryAddWithoutValidation("X-Plex-Token", _token);
         req.Headers.TryAddWithoutValidation("X-Plex-Client-Identifier", clientId);
         req.Headers.TryAddWithoutValidation("Cache-Control", "no-cache");
 

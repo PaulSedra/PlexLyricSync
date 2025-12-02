@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Globalization;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
@@ -16,6 +17,10 @@ public static class ConfigLoader
         public string PlexBaseUrl { get; set; } = "";
         public string PlexToken { get; set; } = "";
         public int SyncedLyricLines { get; set; } = 3;
+        public string PreferredLanguage { get; set; } = "";
+        public bool UseSystemLanguage { get; set; } = true;
+        public bool EnableTranslations { get; set; } = false;
+        public bool ShowTranslations { get; set; } = false;
     }
 
     private static string GetConfigPath()
@@ -37,7 +42,11 @@ public static class ConfigLoader
         File.WriteAllText(path,
             $"PlexBaseUrl: \"{cfg.PlexBaseUrl}\"{Environment.NewLine}" +
             $"PlexToken: \"{cfg.PlexToken}\"{Environment.NewLine}" +
-            $"SyncedLyricLines: {cfg.SyncedLyricLines}{Environment.NewLine}");
+            $"SyncedLyricLines: {cfg.SyncedLyricLines}{Environment.NewLine}" +
+            $"PreferredLanguage: \"{cfg.PreferredLanguage}\"{Environment.NewLine}" +
+            $"UseSystemLanguage: {cfg.UseSystemLanguage}{Environment.NewLine}" +
+            $"EnableTranslations: {cfg.EnableTranslations}{Environment.NewLine}" +
+            $"ShowTranslations: {cfg.ShowTranslations}{Environment.NewLine}");
     }
 
     public static async Task<Config> LoadConfigAsync(Window window)
@@ -90,6 +99,30 @@ public static class ConfigLoader
             .WithNamingConvention(PascalCaseNamingConvention.Instance)
             .Build();
 
-        return deserializer.Deserialize<Config>(yaml) ?? new Config();
+        var cfg = deserializer.Deserialize<Config>(yaml) ?? new Config();
+
+        // Backwards compatibility for configs written before new fields existed
+        cfg.PreferredLanguage ??= "";
+
+        if (!yaml.Contains("UseSystemLanguage:", StringComparison.OrdinalIgnoreCase))
+        {
+            cfg.UseSystemLanguage = true;
+        }
+        if (!yaml.Contains("EnableTranslations:", StringComparison.OrdinalIgnoreCase))
+        {
+            cfg.EnableTranslations = false;
+        }
+        if (!yaml.Contains("ShowTranslations:", StringComparison.OrdinalIgnoreCase))
+        {
+            cfg.ShowTranslations = false;
+        }
+
+        // Determine effective preferred language (config or system)
+        if (cfg.UseSystemLanguage)
+        {
+            cfg.PreferredLanguage = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+        }
+
+        return cfg;
     }
 }

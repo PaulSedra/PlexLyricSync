@@ -31,6 +31,39 @@ public static class LrcParser
         return lines;
     }
 
+    /// <summary>
+    /// Converts non-synced lyrics to synced lyrics using an existing list of lrc lines.
+    /// </summary>
+    /// <param name="syncedLyrics">the list of lrc lines to use in conversion</param>
+    /// <param name="nonSyncedLyrics">the non-synced lyrics to convert</param>
+    /// <returns>string representation of synced lyrics</returns>
+    public static string CopyLrcTimeSpans(List<LrcLine> syncedLyrics, string nonSyncedLyrics)
+    {
+        var lyricsList = nonSyncedLyrics.Split('\n');
+
+        // not sure if the following is actually needed
+        // ensure line counts match to keep timestamps aligned
+        // if (lyricsList.Length < syncedLyrics.Count)
+        // {
+        //     Array.Resize(ref lyricsList, syncedLyrics.Count);
+        // }
+
+        var lrcWriter = new System.Text.StringBuilder();
+        for (int i = 0; i < syncedLyrics.Count; i++)
+        {
+            var line = syncedLyrics[i];
+            var text = lyricsList.Length > i && !string.IsNullOrWhiteSpace(lyricsList[i])
+                ? lyricsList[i]
+                : syncedLyrics[i].Text;
+            lrcWriter.Append('[');
+            lrcWriter.AppendFormat("{0:D2}:{1:D2}.{2:D2}", line.T.Minutes, line.T.Seconds, line.T.Milliseconds / 10);
+            lrcWriter.Append(']');
+            lrcWriter.AppendLine(text);
+        }
+
+        return lrcWriter.ToString();
+    }
+
     // last index whose time <= t, or -1
     public static int IndexAt(IReadOnlyList<LrcLine> L, TimeSpan t)
     {

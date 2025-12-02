@@ -12,18 +12,50 @@
 
         <ListBox x:Name="NavTabs" SelectionChanged="NavTabs_SelectionChanged" Background="#333" Foreground="White" BorderThickness="0" Margin="0,0,20,0">
             <ListBoxItem Content="Plex"/>
+            <ListBoxItem Content="Lyrics"/>
         </ListBox>
 
         <Grid Grid.Column="1">
-            <StackPanel x:Name="PlexPanel" Spacing="12">
-                <TextBox x:Name="PlexUrlBox" Header="Plex URL" TextChanged="SettingChanged"/>
-                <TextBox x:Name="PlexTokenBox" Header="Plex Token" TextChanged="SettingChanged"/>
-                <NumberBox x:Name="SyncedLinesBox"
-                           Header="Synced lyric lines"
-                           Minimum="0"
-                           SpinButtonPlacementMode="Inline"
-                           SmallChange="1"
-                           ValueChanged="SyncedLinesChanged"/>
+            <StackPanel Spacing="12">
+                <StackPanel x:Name="PlexPanel" Spacing="12">
+                    <TextBox x:Name="PlexUrlBox" Header="Plex URL" TextChanged="SettingChanged"/>
+                    <TextBox x:Name="PlexTokenBox" Header="Plex Token" TextChanged="SettingChanged"/>
+                </StackPanel>
+
+                <StackPanel x:Name="LyricsPanel" Spacing="12">
+                    <NumberBox
+                        x:Name="SyncedLinesBox"
+                        Header="Synced lyric lines"
+                        Minimum="0"
+                        SpinButtonPlacementMode="Inline"
+                        SmallChange="1"
+                        ValueChanged="SyncedLinesChanged"/>
+                    <ComboBox
+                        x:Name="PreferredLanguageBox"
+                        Header="Preferred lyrics language"
+                        SelectionChanged="PreferredLanguageChanged">
+                            <ComboBoxItem Content="System default" Tag="system"/>
+                            <ComboBoxItem Content="English" Tag="en"/>
+                            <ComboBoxItem Content="Spanish" Tag="es"/>
+                            <ComboBoxItem Content="French" Tag="fr"/>
+                            <ComboBoxItem Content="German" Tag="de"/>
+                            <ComboBoxItem Content="Japanese" Tag="ja"/>
+                            <ComboBoxItem Content="Korean" Tag="ko"/>
+                            <ComboBoxItem Content="Chinese (Simplified)" Tag="zh"/>
+                    </ComboBox>
+                    <ToggleSwitch
+                        x:Name="EnableTranslationsSwitch"
+                        Header="Enable translations (create translated files)"
+                        Toggled="EnableTranslationsToggled"/>
+                    <Grid x:Name="ShowTranslationsContainer"> <!-- the following Grid and TextBlock are necessary in order to enable tooltip when switch is disabled -->
+                        <TextBlock />
+                        <ToggleSwitch
+                            x:Name="ShowTranslationsSwitch"
+                            Header="Show translations"
+                            Toggled="ShowTranslationsToggled"/>
+                    </Grid>
+                </StackPanel>
+
                 <Button Content="Back" HorizontalAlignment="Right" Click="BackButton_Click"/>
             </StackPanel>
         </Grid>
