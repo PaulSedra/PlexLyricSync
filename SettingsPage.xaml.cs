@@ -140,7 +140,6 @@ public sealed partial class SettingsPage : Page
             return Task.CompletedTask;
 
         _mainWindow._pollCts?.Cancel();
-        _mainWindow._plex?.Dispose();
         _mainWindow._uiTimer.Stop();
         return _mainWindow.InitAsync();
     }

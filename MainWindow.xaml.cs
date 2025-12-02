@@ -56,7 +56,6 @@ public sealed partial class MainWindow : Window
         this.Closed += (_, __) =>
         {
             _pollCts?.Cancel();
-            _plex?.Dispose();
             _uiTimer.Stop();
         };
     }
@@ -175,7 +174,7 @@ public sealed partial class MainWindow : Window
                 await LyricsView.FetchTranslatedLyricsAsync(_artist, _album, _title, trackKey, ct).ConfigureAwait(false);
             }
         }
-        catch
+        catch (Exception ex)
         {
             _artist = _album = _title = _albumArtUrl = _state = "";
             _durationMs = 0;
@@ -184,7 +183,7 @@ public sealed partial class MainWindow : Window
             _predictedViewOffsetMs = 0;
             _predictedViewOffsetUtc = DateTime.UtcNow;
 
-            LyricsView.SetNoLyrics("Unable to connect to Plex. Check server URL or token.");
+            LyricsView.SetNoLyrics("Unable to connect to Plex. Check server URL or token." + ex);
 
             DispatcherQueue.TryEnqueue(() =>
             {

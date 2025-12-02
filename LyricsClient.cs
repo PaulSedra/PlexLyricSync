@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace PlexLyricSync;
 
-public sealed class LyricsClient : IDisposable
+public sealed class LyricsClient
 {
     public record LyricsData(string? syncedLrc, string? plain, string? path);
 
@@ -189,8 +189,6 @@ public sealed class LyricsClient : IDisposable
 
         return null;
     }
-
-    public void Dispose() => _http.Dispose();
 }
 
 // JSON shape from LRCLIBs

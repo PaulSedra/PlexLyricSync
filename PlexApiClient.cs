@@ -19,7 +19,7 @@ public record PlexNowPlayingResult(
     string AlbumArtUrl
 );
 
-public sealed class PlexApiClient : IDisposable
+public sealed class PlexApiClient
 {
     private static readonly HttpClient _http = Http.Client;
     private readonly string _baseUrl;
@@ -166,6 +166,4 @@ public sealed class PlexApiClient : IDisposable
         var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
         return resp.IsSuccessStatusCode;
     }
-
-    public void Dispose() => _http.Dispose();
 }
