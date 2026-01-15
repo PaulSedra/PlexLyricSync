@@ -8,7 +8,7 @@
   IgnorableNamespaces="uap rescap">
 
   <Identity
-    Name="e9777b50-9b34-4393-915a-4e4eac9248db"
+    Name="PlexLyricSync"
     Publisher="CN=woomb"
     Version="1.0.0.0" />
 
@@ -16,8 +16,8 @@
 
   <Properties>
     <DisplayName>PlexLyricSync</DisplayName>
-    <PublisherDisplayName>woomb</PublisherDisplayName>
-    <Logo>Assets\StoreLogo.png</Logo>
+    <PublisherDisplayName>WoombaKumba</PublisherDisplayName>
+    <Logo>Assets\PlexLyricSyncLogo.png</Logo>
   </Properties>
 
   <Dependencies>
@@ -37,10 +37,10 @@
         DisplayName="PlexLyricSync"
         Description="PlexLyricSync"
         BackgroundColor="transparent"
-        Square150x150Logo="Assets\Square150x150Logo.png"
-        Square44x44Logo="Assets\Square44x44Logo.png">
-        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
-        <uap:SplashScreen Image="Assets\SplashScreen.png" />
+        Square150x150Logo="Assets\PlexLyricSyncLogo.png"
+        Square44x44Logo="Assets\PlexLyricSyncLogo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\PlexLyricSyncLogo.png" />
+        <uap:SplashScreen Image="Assets\PlexLyricSyncLogo.png" />
       </uap:VisualElements>
     </Application>
   </Applications>
