@@ -4,7 +4,6 @@ using System.IO;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Windows.Storage;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
@@ -17,16 +16,17 @@ public static class ConfigLoader
         public string PlexBaseUrl { get; set; } = "";
         public string PlexToken { get; set; } = "";
         public int SyncedLyricLines { get; set; } = 3;
+        public string LibreTranslateBaseUrl { get; set; } = "";
         public string PreferredLanguage { get; set; } = "";
         public bool UseSystemLanguage { get; set; } = true;
-        public bool EnableTranslations { get; set; } = false;
-        public bool ShowTranslations { get; set; } = false;
+        public bool EnableTranslations { get; set; }
+        public bool ShowTranslations { get; set; }
     }
 
     private static string GetConfigPath()
     {
-        var localDir = ApplicationData.Current.LocalFolder.Path;
-        return Path.Combine(localDir, "appsettings.config.yaml");
+        var music = Environment.GetFolderPath(Environment.SpecialFolder.MyMusic);
+        return Path.Combine(music, "PlexLyricSync", "appsettings.config.yaml");
     }
 
     public static Config LoadExisting()
@@ -43,10 +43,17 @@ public static class ConfigLoader
             $"PlexBaseUrl: \"{cfg.PlexBaseUrl}\"{Environment.NewLine}" +
             $"PlexToken: \"{cfg.PlexToken}\"{Environment.NewLine}" +
             $"SyncedLyricLines: {cfg.SyncedLyricLines}{Environment.NewLine}" +
+            $"LibreTranslateBaseUrl: {cfg.LibreTranslateBaseUrl}{Environment.NewLine}" +
             $"PreferredLanguage: \"{cfg.PreferredLanguage}\"{Environment.NewLine}" +
             $"UseSystemLanguage: {cfg.UseSystemLanguage}{Environment.NewLine}" +
             $"EnableTranslations: {cfg.EnableTranslations}{Environment.NewLine}" +
             $"ShowTranslations: {cfg.ShowTranslations}{Environment.NewLine}");
+    }
+
+    public static Config LoadConfigAsync()
+    {
+        var path = GetConfigPath();
+        return Deserialize(path);
     }
 
     public static async Task<Config> LoadConfigAsync(Window window)

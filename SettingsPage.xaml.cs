@@ -29,6 +29,7 @@ public sealed partial class SettingsPage : Page
         PlexUrlBox.Text = _config.PlexBaseUrl;
         PlexTokenBox.Text = _config.PlexToken;
         SyncedLinesBox.Value = _config.SyncedLyricLines;
+        LibreTranslateBaseUrlBox.Text = _config.LibreTranslateBaseUrl;
         InitializePreferredLanguageSelection();
         EnableTranslationsSwitch.IsOn = _config.EnableTranslations;
         UpdateShowTranslationsAvailability();
@@ -43,6 +44,7 @@ public sealed partial class SettingsPage : Page
 
         _config.PlexBaseUrl = PlexUrlBox.Text;
         _config.PlexToken = PlexTokenBox.Text;
+        _config.LibreTranslateBaseUrl = LibreTranslateBaseUrlBox.Text;
         ConfigLoader.SaveConfig(_config);
 
         _debounceTimer.Stop();

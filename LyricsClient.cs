@@ -95,7 +95,7 @@ public sealed class LyricsClient
     public static async Task<LyricsData?> GetLocalTranslationAsync(string artist, string album, string title, string targetLanguage, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(targetLanguage)) return null;
-        return await ReadLyricsDataAsync(album, artist, title + "_" + targetLanguage, ct);
+        return await ReadLyricsDataAsync(artist, album, title + "_" + targetLanguage, ct);
     }
 
     /// <summary>
@@ -111,7 +111,10 @@ public sealed class LyricsClient
         
         LrcDoc lrcDoc = new();
 
-        // synced lyrics translation
+        var config = ConfigLoader.LoadConfigAsync();
+        LibreTranslateClient libreTranslateClient = new(config.LibreTranslateBaseUrl);
+
+            // synced lyrics translation
         if (!string.IsNullOrWhiteSpace(original.syncedLrc))
         {
             var parsed = LrcParser.Parse(original.syncedLrc);
@@ -119,7 +122,7 @@ public sealed class LyricsClient
 
             var originalLines = parsed.Select(l => l.Text).ToArray();
             var joined = string.Join("\n", originalLines);
-            var translated = await LibreTranslateClient.TranslateTextAsync(joined, targetLanguage, ct);
+            var translated = await libreTranslateClient.TranslateTextAsync(joined, targetLanguage, ct);
 
             if (string.IsNullOrWhiteSpace(translated)) lrcDoc.SyncedLyrics = null;
             else lrcDoc.SyncedLyrics = LrcParser.CopyLrcTimeSpans(parsed, translated);
@@ -127,7 +130,7 @@ public sealed class LyricsClient
         // plain lyrics translation
         else if (!string.IsNullOrWhiteSpace(original.plain))
         {
-            lrcDoc.PlainLyrics = await LibreTranslateClient.TranslateTextAsync(original.plain, targetLanguage, ct);
+            lrcDoc.PlainLyrics = await libreTranslateClient.TranslateTextAsync(original.plain, targetLanguage, ct);
         }
 
         return WriteLyricsDataFromDoc(lrcDoc, artist, album, title + "_" + targetLanguage);

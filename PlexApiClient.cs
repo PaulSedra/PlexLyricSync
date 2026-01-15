@@ -19,22 +19,15 @@ public record PlexNowPlayingResult(
     string AlbumArtUrl
 );
 
-public sealed class PlexApiClient
+public sealed class PlexApiClient(string plexBaseUrl, string plexToken)
 {
     private static readonly HttpClient _http = Http.Client;
-    private readonly string _baseUrl;
-    private readonly string _token;
-
-    public PlexApiClient(string plexBaseUrl, string plexToken)
-    {
-        _baseUrl = plexBaseUrl.TrimEnd('/');
-        _token = plexToken;
-    }
+    private readonly string _baseUrl = plexBaseUrl.TrimEnd('/');
 
     public async Task<PlexNowPlayingResult?> GetPlexampNowPlayingAsync(CancellationToken ct)
     {
         using var req = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/status/sessions");
-        req.Headers.TryAddWithoutValidation("X-Plex-Token", _token);
+        req.Headers.TryAddWithoutValidation("X-Plex-Token", plexToken);
         req.Headers.TryAddWithoutValidation("Cache-Control", "no-cache");
 
         var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
@@ -85,7 +78,7 @@ public sealed class PlexApiClient
             ?? string.Empty;
         string artUrl = string.IsNullOrWhiteSpace(artPath)
             ? string.Empty
-            : $"{_baseUrl}{artPath}?X-Plex-Token={_token}";
+            : $"{_baseUrl}{artPath}?X-Plex-Token={plexToken}";
 
         if (string.IsNullOrWhiteSpace(artist) && string.IsNullOrWhiteSpace(title))
             return null;
@@ -107,7 +100,7 @@ public sealed class PlexApiClient
         if (offsetMs < 0) offsetMs = 0;
 
         using var req = new HttpRequestMessage(HttpMethod.Get, $"{clientUrl}/player/playback/seekTo?offset={offsetMs}");
-        req.Headers.TryAddWithoutValidation("X-Plex-Token", _token);
+        req.Headers.TryAddWithoutValidation("X-Plex-Token", plexToken);
         req.Headers.TryAddWithoutValidation("X-Plex-Client-Identifier", clientId);
         req.Headers.TryAddWithoutValidation("Cache-Control", "no-cache");
 
@@ -159,7 +152,7 @@ public sealed class PlexApiClient
         if (string.IsNullOrWhiteSpace(clientId)) return false;
 
         using var req = new HttpRequestMessage(HttpMethod.Get, $"{clientUrl}/player/playback/{command}");
-        req.Headers.TryAddWithoutValidation("X-Plex-Token", _token);
+        req.Headers.TryAddWithoutValidation("X-Plex-Token", plexToken);
         req.Headers.TryAddWithoutValidation("X-Plex-Client-Identifier", clientId);
         req.Headers.TryAddWithoutValidation("Cache-Control", "no-cache");
 

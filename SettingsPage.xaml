@@ -30,6 +30,7 @@
                         SpinButtonPlacementMode="Inline"
                         SmallChange="1"
                         ValueChanged="SyncedLinesChanged"/>
+                    <TextBox x:Name="LibreTranslateBaseUrlBox" Header="LibreTranslate URL" TextChanged="SettingChanged"/>
                     <ComboBox
                         x:Name="PreferredLanguageBox"
                         Header="Preferred lyrics language"
