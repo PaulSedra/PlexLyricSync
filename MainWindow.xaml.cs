@@ -33,6 +33,9 @@ public sealed partial class MainWindow : Window
 
     // Display clock (predicted position between server ticks)
     internal readonly DispatcherTimer _uiTimer = new() { Interval = TimeSpan.FromMilliseconds(200) };
+    private readonly DispatcherTimer _controlsIdleTimer = new() { Interval = TimeSpan.FromSeconds(3) };
+    private readonly DispatcherTimer _pointerStillTimer = new() { Interval = TimeSpan.FromMilliseconds(150) };
+    private bool _controlsVisible;
 
     public MainWindow()
     {
@@ -52,11 +55,15 @@ public sealed partial class MainWindow : Window
         LyricsView.MainWindow = this;
 
         ((FrameworkElement)Content).Loaded += MainWindow_Loaded;
+        _controlsIdleTimer.Tick += ControlsIdleTimer_Tick;
+        _pointerStillTimer.Tick += PointerStillTimer_Tick;
 
         this.Closed += (_, __) =>
         {
             _pollCts?.Cancel();
             _uiTimer.Stop();
+            _controlsIdleTimer.Stop();
+            _pointerStillTimer.Stop();
         };
     }
 
@@ -109,7 +116,7 @@ public sealed partial class MainWindow : Window
     private async Task RunPollLoopAsync(CancellationToken ct)
     {
         // poll 5 times per second
-        using var timer = new System.Threading.PeriodicTimer(TimeSpan.FromMilliseconds(200));
+        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(200));
         while (await timer.WaitForNextTickAsync(ct))
         {
             await PollPlexAsync(ct);
@@ -256,7 +263,7 @@ public sealed partial class MainWindow : Window
     /// </summary>
     private void Window_PointerEntered(object _, PointerRoutedEventArgs __)
     {
-        ControlPanel.AnimateControls(0);
+        HandlePointerActivity();
     }
 
     /// <summary>
@@ -264,6 +271,41 @@ public sealed partial class MainWindow : Window
     /// </summary>
     private void Window_PointerExited(object _, PointerRoutedEventArgs __)
     {
+        if (!_controlsVisible) return;
         ControlPanel.AnimateControls(ControlPanel._controlsHeight);
+        _controlsVisible = false;
+        _controlsIdleTimer.Stop();
+        _pointerStillTimer.Stop();
+    }
+
+    private void Window_PointerMoved(object _, PointerRoutedEventArgs __)
+    {
+        HandlePointerActivity();
+    }
+
+    private void HandlePointerActivity()
+    {
+        if (_controlsVisible) return;
+        ControlPanel.AnimateControls(0);
+        _controlsVisible = true;
+        _controlsIdleTimer.Stop();
+        _pointerStillTimer.Stop();
+        _pointerStillTimer.Start();
+    }
+
+    private void ControlsIdleTimer_Tick(object? sender, object e)
+    {
+        _controlsIdleTimer.Stop();
+        if (!_controlsVisible) return;
+        ControlPanel.AnimateControls(ControlPanel._controlsHeight);
+        _controlsVisible = false;
+    }
+
+    private void PointerStillTimer_Tick(object? sender, object e)
+    {
+        _pointerStillTimer.Stop();
+        if (!_controlsVisible) return;
+        _controlsIdleTimer.Stop();
+        _controlsIdleTimer.Start();
     }
 }

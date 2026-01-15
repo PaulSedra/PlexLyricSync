@@ -15,6 +15,11 @@ public sealed partial class PlayerControls : UserControl
 
     private bool _isSeeking = false;     // true while user is dragging the progress bar
     internal double _controlsHeight;
+    private double _controlsContentHeight;
+    private double _progressHeight = 6;
+    private const double ControlsHidePadding = 32;
+    private const double ProgressSpacing = 14;
+    private const double ProgressInsetPerSide = 16;
 
     public PlayerControls()
     {
@@ -22,8 +27,10 @@ public sealed partial class PlayerControls : UserControl
 
         ControlsContainer.Loaded += (_, __) =>
         {
-            _controlsHeight = ControlsContainer.ActualHeight + 32;
+            _controlsContentHeight = ControlsContainer.ActualHeight;
+            _controlsHeight = _controlsContentHeight + ControlsHidePadding;
             ControlsTranslate.Y = _controlsHeight;
+            SongProgressScale.ScaleX = 1.0;
         };
     }
 
@@ -206,15 +213,49 @@ public sealed partial class PlayerControls : UserControl
     public void AnimateControls(double pixels)
     {
         var sb = new Storyboard();
+        bool showing = pixels == 0;
+        var easing = new CubicEase { EasingMode = showing ? EasingMode.EaseOut : EasingMode.EaseIn };
+
         var anim = new DoubleAnimation
         {
             To = pixels,
             Duration = TimeSpan.FromMilliseconds(400),
-            EasingFunction = new CubicEase { EasingMode = pixels == 0? EasingMode.EaseOut : EasingMode.EaseIn }
+            EasingFunction = easing
         };
         Storyboard.SetTarget(anim, ControlsTranslate);
         Storyboard.SetTargetProperty(anim, "Y");
+
+        var SongProgressTranslateAnimation = new DoubleAnimation
+        {
+            To = showing ? - (_controlsContentHeight + ProgressSpacing + _progressHeight) : 0,
+            Duration = TimeSpan.FromMilliseconds(400),
+            EasingFunction = easing
+        };
+        Storyboard.SetTarget(SongProgressTranslateAnimation, SongProgressTranslate);
+        Storyboard.SetTargetProperty(SongProgressTranslateAnimation, "Y");
+
+        double scaleTarget = showing ? ComputeShownScale() : 1.0;
+        var SongProgressScaleAnimation = new DoubleAnimation
+        {
+            To = scaleTarget,
+            Duration = TimeSpan.FromMilliseconds(400),
+            EasingFunction = easing
+        };
+        Storyboard.SetTarget(SongProgressScaleAnimation, SongProgressScale);
+        Storyboard.SetTargetProperty(SongProgressScaleAnimation, "ScaleX");
+
         sb.Children.Add(anim);
+        sb.Children.Add(SongProgressTranslateAnimation);
+        sb.Children.Add(SongProgressScaleAnimation);
         sb.Begin();
+    }
+
+    private double ComputeShownScale()
+    {
+        double width = SongProgress.ActualWidth;
+        if (width <= 0) return 1.0;
+        double targetWidth = Math.Max(width - (2 * ProgressInsetPerSide), 0);
+        double scale = targetWidth / width;
+        return Math.Clamp(scale, 0.1, 1.0);
     }
 }

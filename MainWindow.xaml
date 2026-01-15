@@ -7,9 +7,13 @@
     Title="PlexLyricSync">
 
 
-    <Grid Background="Transparent" PointerEntered="Window_PointerEntered" PointerExited="Window_PointerExited">
+    <Grid Background="Transparent" PointerEntered="Window_PointerEntered" PointerExited="Window_PointerExited" PointerMoved="Window_PointerMoved">
         <!-- Album art background -->
-        <Image x:Name="AlbumArtImage" Stretch="UniformToFill" />
+        <Image
+            x:Name="AlbumArtImage"
+            Stretch="UniformToFill"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center" />
 
         <Grid Background="#CC111111">
             <Grid.RowDefinitions>
