@@ -6,6 +6,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.Graphics;
+using Microsoft.UI.Xaml.Media.Animation;
 
 namespace PlexLyricSync;
 
@@ -22,7 +23,8 @@ public sealed partial class MainWindow : Window
     internal CancellationTokenSource? _pollCts;
 
     // latest plex metadata
-    private string _artist = "", _album = "", _title = "", _albumArtUrl = "";
+    private string _ratingKey = "", _artist = "", _album = "", _title = "", _albumArtUrl = "";
+    private bool _trackLiked;
     internal string _state = "";
     internal int _durationMs = 0;
     private int _viewOffsetMs = 0;
@@ -132,7 +134,7 @@ public sealed partial class MainWindow : Window
 
             if (np is null)
             {
-                _artist = _album = _title = _albumArtUrl = _state = "";
+                _ratingKey = _artist = _album = _title = _albumArtUrl = _state = "";
                 _durationMs = 0;
                 _viewOffsetMs = 0;
 
@@ -146,21 +148,25 @@ public sealed partial class MainWindow : Window
                 return;
             }
 
+            var npTrackLiked = await _plex.GetTrackLikedAsync(np.RatingKey, ct);
+
             // Capture client id for control (seek)
             _clientUrl = "http://" + np.ClientUrl + ":32500" ?? _clientId;
             _clientId = np.ClientId ?? _clientId;
 
             // change detection
-            bool trackChanged = np.Artist != _artist || np.Album != _album || np.Title != _title || np.DurationMs != _durationMs || np.AlbumArtUrl != _albumArtUrl;
+            bool trackChanged = np.RatingKey != _ratingKey || np.Artist != _artist || np.Album != _album || np.Title != _title || npTrackLiked != _trackLiked || np.DurationMs != _durationMs || np.AlbumArtUrl != _albumArtUrl;
             bool stateChanged = !np.State.Equals(_state, StringComparison.OrdinalIgnoreCase);
             bool viewOffsetChanged = np.ViewOffsetMs != _viewOffsetMs;
 
             if (trackChanged || stateChanged || viewOffsetChanged)
             {
                 // track
+                _ratingKey = np.RatingKey;
                 _artist = np.Artist;
                 _album = np.Album;
                 _title = np.Title;
+                _trackLiked = npTrackLiked;
                 _albumArtUrl = np.AlbumArtUrl;
                 _durationMs = np.DurationMs;
                 _state = np.State;
@@ -194,6 +200,7 @@ public sealed partial class MainWindow : Window
 
             DispatcherQueue.TryEnqueue(() =>
             {
+                FavoriteButton.Visibility = Visibility.Collapsed;
                 ArtistBlock.Text = string.Empty;
                 NowPlaying.Text = string.Empty;
                 AlbumArtImage.Source = null;
@@ -242,8 +249,9 @@ public sealed partial class MainWindow : Window
     /// <summary>
     /// Updates track title/artist and album art.
     /// </summary>
-    internal void UpdateTrackInformation()
+    private void UpdateTrackInformation()
     {
+        FavoriteIcon.Glyph = _trackLiked ? "\ueb52" : "\ueb51";
         ArtistBlock.Text = !string.IsNullOrWhiteSpace(_artist) ? _artist : "";
         NowPlaying.Text = !string.IsNullOrWhiteSpace(_title) ? _title : "Peace and quiet";
         AlbumArtImage.Source = !string.IsNullOrWhiteSpace(_albumArtUrl) ? new BitmapImage(new Uri(_albumArtUrl)) : null;
@@ -307,5 +315,23 @@ public sealed partial class MainWindow : Window
         if (!_controlsVisible) return;
         _controlsIdleTimer.Stop();
         _controlsIdleTimer.Start();
+    }
+
+    private async void FavoriteButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_plex is null || string.IsNullOrWhiteSpace(_ratingKey)) return;
+
+        _trackLiked = !_trackLiked;
+
+        if (!_trackLiked)
+        {
+            var sb = (Storyboard)FavRoot.Resources["UnfavoriteExplosion"];
+            sb.Stop();
+            sb.Begin();
+        }
+
+        UpdateTrackInformation();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1.5));
+        await _plex.SetTrackLikedAsync(_ratingKey, _trackLiked, cts.Token);
     }
 }

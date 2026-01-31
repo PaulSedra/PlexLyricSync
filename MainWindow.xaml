@@ -6,7 +6,6 @@
     xmlns:local="using:PlexLyricSync"
     Title="PlexLyricSync">
 
-
     <Grid Background="Transparent" PointerEntered="Window_PointerEntered" PointerExited="Window_PointerExited" PointerMoved="Window_PointerMoved">
         <!-- Album art background -->
         <Image
@@ -35,12 +34,97 @@
                         x:Name="ArtistBlock"
                         FontSize="14"
                         Text=""/>
-                    <TextBlock
-                        x:Name="NowPlaying"
-                        FontSize="18"
-                        Foreground="White"
-                        Text="Waiting for playback…"
-                        TextWrapping="WrapWholeWords"/>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock
+                            x:Name="NowPlaying"
+                            FontSize="18"
+                            Foreground="White"
+                            Text="Waiting for playback…"
+                            TextWrapping="WrapWholeWords"/>
+                        <Button x:Name="FavoriteButton" Style="{StaticResource FavoriteTrackButton}" Click="FavoriteButton_Click">
+                            <Grid x:Name="FavRoot" Width="30" Height="30" Background="Transparent">
+
+                                <FontIcon x:Name="FavoriteIcon"
+                                          Glyph="&#xEB52;"
+                                          FontFamily="Segoe Fluent Icons"
+                                          Foreground="Pink"
+                                          FontSize="18"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          Opacity="1"/>
+
+                                <Canvas x:Name="Burst"
+                                        Opacity="0"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Width="30" Height="30"
+                                        RenderTransformOrigin="0.5,0.5">
+                                    <Canvas.RenderTransform>
+                                        <ScaleTransform x:Name="BurstScale" ScaleX="0.6" ScaleY="0.6"/>
+                                    </Canvas.RenderTransform>
+
+                                    <!-- 6 little circles around -->
+                                    <Ellipse Width="4" Height="4" Fill="Pink" Canvas.Left="13" Canvas.Top="0"/>
+                                    <Ellipse Width="4" Height="4" Fill="Pink" Canvas.Left="23" Canvas.Top="5"/>
+                                    <Ellipse Width="4" Height="4" Fill="Pink" Canvas.Left="26" Canvas.Top="14"/>
+                                    <Ellipse Width="4" Height="4" Fill="Pink" Canvas.Left="23" Canvas.Top="23"/>
+                                    <Ellipse Width="4" Height="4" Fill="Pink" Canvas.Left="13" Canvas.Top="26"/>
+                                    <Ellipse Width="4" Height="4" Fill="Pink" Canvas.Left="0"  Canvas.Top="14"/>
+                                </Canvas>
+
+                                <Grid.Resources>
+                                    <Storyboard x:Name="UnfavoriteExplosion">
+
+                                        <!-- Glyph changes -->
+                                        <ObjectAnimationUsingKeyFrames
+                                            Storyboard.TargetName="FavoriteIcon"
+                                            Storyboard.TargetProperty="Glyph">
+                                            <DiscreteObjectKeyFrame KeyTime="0:0:0.00" Value="&#xEA92;"/> <!-- broken -->
+                                            <DiscreteObjectKeyFrame KeyTime="0:0:0.30" Value="&#xEB51;"/> <!-- outline -->
+                                        </ObjectAnimationUsingKeyFrames>
+
+                                        <!-- Heart opacity -->
+                                        <DoubleAnimationUsingKeyFrames
+                                            Storyboard.TargetName="FavoriteIcon"
+                                            Storyboard.TargetProperty="Opacity">
+                                            <DiscreteDoubleKeyFrame KeyTime="0:0:0.00" Value="1"/>
+                                            <DiscreteDoubleKeyFrame KeyTime="0:0:0.29" Value="0"/>
+                                            <EasingDoubleKeyFrame KeyTime="0:0:0.50" Value="1"/>
+                                        </DoubleAnimationUsingKeyFrames>
+
+                                        <!-- Burst opacity -->
+                                        <DoubleAnimationUsingKeyFrames
+                                            Storyboard.TargetName="Burst"
+                                            Storyboard.TargetProperty="Opacity">
+                                            <DiscreteDoubleKeyFrame KeyTime="0:0:0.00" Value="0"/>
+                                            <DiscreteDoubleKeyFrame KeyTime="0:0:0.06" Value="1"/>
+                                            <EasingDoubleKeyFrame KeyTime="0:0:0.30" Value="0"/>
+                                        </DoubleAnimationUsingKeyFrames>
+
+                                        <!-- Burst scale X -->
+                                        <DoubleAnimationUsingKeyFrames
+                                            Storyboard.TargetName="BurstScale"
+                                            Storyboard.TargetProperty="ScaleX">
+                                            <DiscreteDoubleKeyFrame KeyTime="0:0:0.00" Value="0.6"/>
+                                            <EasingDoubleKeyFrame KeyTime="0:0:0.24" Value="1.6"/>
+                                            <DiscreteDoubleKeyFrame KeyTime="0:0:0.30" Value="0.6"/>
+                                        </DoubleAnimationUsingKeyFrames>
+
+                                        <!-- Burst scale Y -->
+                                        <DoubleAnimationUsingKeyFrames
+                                            Storyboard.TargetName="BurstScale"
+                                            Storyboard.TargetProperty="ScaleY">
+                                            <DiscreteDoubleKeyFrame KeyTime="0:0:0.00" Value="0.6"/>
+                                            <EasingDoubleKeyFrame KeyTime="0:0:0.24" Value="1.6"/>
+                                            <DiscreteDoubleKeyFrame KeyTime="0:0:0.30" Value="0.6"/>
+                                        </DoubleAnimationUsingKeyFrames>
+
+                                    </Storyboard>
+
+                                </Grid.Resources>
+                            </Grid>
+                        </Button>
+                    </StackPanel>
                 </StackPanel>
 
                 <Grid Grid.Row="1">

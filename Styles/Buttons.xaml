@@ -1,0 +1,84 @@
+﻿<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <ResourceDictionary.MergedDictionaries>
+        <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+    </ResourceDictionary.MergedDictionaries>
+
+    <Style
+        x:Key="BasicButton"
+        BasedOn="{StaticResource DefaultButtonStyle}"
+        TargetType="Button">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Grid x:Name="RootGrid">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="FavoriteTrackButton"
+           TargetType="Button"
+           BasedOn="{StaticResource BasicButton}">
+        <Setter Property="Width" Value="30"/>
+        <Setter Property="Height" Value="30"/>
+        <Setter Property="Margin" Value="6 -2 0 0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Grid Background="Transparent">
+                        <ContentPresenter x:Name="CP"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          Content="{TemplateBinding Content}"
+                                          RenderTransformOrigin="0.5,0.5">
+                            <ContentPresenter.RenderTransform>
+                                <ScaleTransform x:Name="IconScale" ScaleX="1" ScaleY="1"/>
+                            </ContentPresenter.RenderTransform>
+                        </ContentPresenter>
+
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="IconScale"
+                                                         Storyboard.TargetProperty="ScaleX"
+                                                         To="1" Duration="0:0:0.10"/>
+                                        <DoubleAnimation Storyboard.TargetName="IconScale"
+                                                         Storyboard.TargetProperty="ScaleY"
+                                                         To="1" Duration="0:0:0.10"/>
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="PointerOver">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="IconScale"
+                                                         Storyboard.TargetProperty="ScaleX"
+                                                         To="1.10" Duration="0:0:0.10"/>
+                                        <DoubleAnimation Storyboard.TargetName="IconScale"
+                                                         Storyboard.TargetProperty="ScaleY"
+                                                         To="1.10" Duration="0:0:0.10"/>
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="IconScale" Storyboard.TargetProperty="ScaleX" To="1.5" Duration="0:0:0.03"/>
+                                        <DoubleAnimation Storyboard.TargetName="IconScale" Storyboard.TargetProperty="ScaleY" To="1.5" Duration="0:0:0.03"/>
+                                    </Storyboard>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</ResourceDictionary>

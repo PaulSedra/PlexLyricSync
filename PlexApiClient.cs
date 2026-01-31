@@ -8,6 +8,7 @@ using System.Xml.Linq;
 namespace PlexLyricSync;
 
 public record PlexNowPlayingResult(
+    string RatingKey,
     string Artist,
     string Album,
     string Title,
@@ -57,6 +58,7 @@ public sealed class PlexApiClient(string plexBaseUrl, string plexToken)
         var tr = plexamp.Track;
         var player = tr.Element("Player");
 
+        string ratingKey = tr.Attribute("ratingKey")?.Value ?? "";
         string artist = tr.Attribute("grandparentTitle")?.Value ?? "";
         string album = tr.Attribute("parentTitle")?.Value ?? "";
         string title = tr.Attribute("title")?.Value ?? "";
@@ -83,7 +85,7 @@ public sealed class PlexApiClient(string plexBaseUrl, string plexToken)
         if (string.IsNullOrWhiteSpace(artist) && string.IsNullOrWhiteSpace(title))
             return null;
 
-        return new PlexNowPlayingResult(artist, album, title, offset, duration, state, clientUrl, clientId, artUrl);
+        return new PlexNowPlayingResult(ratingKey, artist, album, title, offset, duration, state, clientUrl, clientId, artUrl);
     }
 
     /// <summary>
@@ -147,13 +149,58 @@ public sealed class PlexApiClient(string plexBaseUrl, string plexToken)
     /// <param name="clientId">id of player client to control</param>
     /// <param name="command"></param>
     /// <param name="ct">cancellation token</param>
-    private async Task<bool> SendPlaybackCommandAsync(string clientUrl, string clientId, string command, CancellationToken ct)
+    public async Task<bool> SendPlaybackCommandAsync(string clientUrl, string clientId, string command, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(clientId)) return false;
 
         using var req = new HttpRequestMessage(HttpMethod.Get, $"{clientUrl}/player/playback/{command}");
         req.Headers.TryAddWithoutValidation("X-Plex-Token", plexToken);
         req.Headers.TryAddWithoutValidation("X-Plex-Client-Identifier", clientId);
+        req.Headers.TryAddWithoutValidation("Cache-Control", "no-cache");
+
+        var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+        return resp.IsSuccessStatusCode;
+    }
+
+    /// <summary>
+    /// Gets whether a Plex music track is "liked" (hearted) by checking its userRating.
+    /// Plex uses userRating 1-10; most clients use 10 as "liked" and 0/empty as "unrated".
+    /// </summary>
+    /// <param name="ratingKey">The track's Plex ratingKey (metadata id)</param>
+    /// <param name="ct">Cancellation token</param>
+    /// <returns>true if liked; false if unrated or unknown</returns>
+    public async Task<bool> GetTrackLikedAsync(string ratingKey, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(ratingKey)) return false;
+
+        using var req = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/library/metadata/{ratingKey}");
+        req.Headers.TryAddWithoutValidation("X-Plex-Token", plexToken);
+        req.Headers.TryAddWithoutValidation("Cache-Control", "no-cache");
+        req.Headers.TryAddWithoutValidation("Accept", "application/xml");
+
+        var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+        if (!resp.IsSuccessStatusCode) return false;
+
+        var xml = await resp.Content.ReadAsStringAsync(ct);
+        return xml.Contains("userRating=\"10.0\"", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Sets whether a Plex music track is "liked" (hearted) by setting its userRating.
+    /// "liked" -> rating=10, "unrated" -> rating=0.
+    /// </summary>
+    /// <param name="ratingKey">The track's Plex ratingKey (metadata id)</param>
+    /// <param name="liked">true to like/heart, false to clear/unrate</param>
+    /// <param name="ct">Cancellation token</param>
+    public async Task<bool> SetTrackLikedAsync(string ratingKey, bool liked, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(ratingKey)) return false;
+
+        var rating = liked ? 10 : -1;
+        var url = $"{_baseUrl}/:/rate" + $"?key={Uri.EscapeDataString(ratingKey)}" + $"&identifier=com.plexapp.plugins.library" + $"&rating={rating}";
+
+        using var req = new HttpRequestMessage(HttpMethod.Put, url);
+        req.Headers.TryAddWithoutValidation("X-Plex-Token", plexToken);
         req.Headers.TryAddWithoutValidation("Cache-Control", "no-cache");
 
         var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
