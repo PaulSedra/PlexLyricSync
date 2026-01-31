@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.RegularExpressions;
 
-namespace PlexLyricSync;
+namespace PlexLyricSync.Utils;
 
 public record LrcLine(TimeSpan T, string Text);
 

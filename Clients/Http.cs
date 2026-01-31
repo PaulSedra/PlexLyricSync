@@ -1,6 +1,6 @@
 ﻿using System.Net.Http;
 
-namespace PlexLyricSync;
+namespace PlexLyricSync.Clients;
 public static class Http
 {
     public static readonly HttpClient Client = new();

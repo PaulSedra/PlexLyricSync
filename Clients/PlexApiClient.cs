@@ -5,7 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
-namespace PlexLyricSync;
+namespace PlexLyricSync.Clients;
 
 public record PlexNowPlayingResult(
     string RatingKey,

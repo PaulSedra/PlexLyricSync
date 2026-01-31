@@ -5,8 +5,9 @@ using System.Net.Http.Json;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using PlexLyricSync.Utils;
 
-namespace PlexLyricSync;
+namespace PlexLyricSync.Clients;
 
 public sealed class LyricsClient
 {

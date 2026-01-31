@@ -3,7 +3,7 @@ using System.Net.Http.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace PlexLyricSync;
+namespace PlexLyricSync.Clients;
 
 public sealed class LibreTranslateClient(string libreTranslateBaseUrl)
 {

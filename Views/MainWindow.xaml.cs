@@ -7,6 +7,8 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.Graphics;
 using Microsoft.UI.Xaml.Media.Animation;
+using PlexLyricSync.Clients;
+using PlexLyricSync.Utils;
 
 namespace PlexLyricSync;
 

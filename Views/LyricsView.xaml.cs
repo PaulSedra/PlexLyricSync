@@ -11,6 +11,8 @@ using Microsoft.UI.Text;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI;
 using Microsoft.UI.Xaml.Documents;
+using PlexLyricSync.Clients;
+using PlexLyricSync.Utils;
 
 namespace PlexLyricSync;
 

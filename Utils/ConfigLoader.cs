@@ -7,7 +7,7 @@ using Microsoft.UI.Xaml.Controls;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
 
-namespace PlexLyricSync;
+namespace PlexLyricSync.Utils;
 
 public static class ConfigLoader
 {
