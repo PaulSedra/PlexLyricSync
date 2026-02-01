@@ -1,8 +1,7 @@
 <Page
-    x:Class="PlexLyricSync.SettingsPage"
+    x:Class="PlexLyricSync.Views.SettingsPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:local="using:PlexLyricSync"
     Background="#111111">
     <Grid Padding="20">
         <Grid.ColumnDefinitions>

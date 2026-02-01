@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Window
-    x:Class="PlexLyricSync.MainWindow"
+    x:Class="PlexLyricSync.Views.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:local="using:PlexLyricSync"
+    xmlns:views="using:PlexLyricSync.Views"
     Title="PlexLyricSync">
 
     <Grid Background="Transparent" PointerEntered="Window_PointerEntered" PointerExited="Window_PointerExited" PointerMoved="Window_PointerMoved">
@@ -128,8 +128,8 @@
                 </StackPanel>
 
                 <Grid Grid.Row="1">
-                    <local:LyricsView x:Name="LyricsView" VerticalAlignment="Stretch" HorizontalAlignment="Stretch"/>
-                    <local:PlayerControls x:Name="ControlPanel" VerticalAlignment="Bottom"/>
+                    <views:LyricsView x:Name="LyricsView" VerticalAlignment="Stretch" HorizontalAlignment="Stretch"/>
+                    <views:PlayerControls x:Name="ControlPanel" VerticalAlignment="Bottom"/>
                 </Grid>
             </Grid>
 

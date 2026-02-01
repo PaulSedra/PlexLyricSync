@@ -6,10 +6,7 @@
         <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
     </ResourceDictionary.MergedDictionaries>
 
-    <Style
-        x:Key="BasicButton"
-        BasedOn="{StaticResource DefaultButtonStyle}"
-        TargetType="Button">
+    <Style x:Key="BasicButton" TargetType="Button">
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">

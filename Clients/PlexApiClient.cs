@@ -1,41 +1,37 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
+using PlexLyricSync.Models;
 
 namespace PlexLyricSync.Clients;
 
-public record PlexNowPlayingResult(
-    string RatingKey,
-    string Artist,
-    string Album,
-    string Title,
-    int ViewOffsetMs,
-    int DurationMs,
-    string State,
-    string ClientUrl,
-    string ClientId,
-    string AlbumArtUrl
-);
-
 public sealed class PlexApiClient(string plexBaseUrl, string plexToken)
 {
-    private static readonly HttpClient _http = Http.Client;
+    private static readonly HttpClient Http = Clients.Http.Client;
     private readonly string _baseUrl = plexBaseUrl.TrimEnd('/');
-
-    public async Task<PlexNowPlayingResult?> GetPlexampNowPlayingAsync(CancellationToken ct)
+    private readonly IReadOnlyDictionary<string, string> _headers = new Dictionary<string, string>
     {
-        using var req = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/status/sessions");
-        req.Headers.TryAddWithoutValidation("X-Plex-Token", plexToken);
-        req.Headers.TryAddWithoutValidation("Cache-Control", "no-cache");
+        ["X-Plex-Token"] = plexToken,
+        ["Cache-Control"] = "no-cache"
+    };
+    private Dictionary<string, string> _headersWithClientId(string clientId) => new(_headers)
+    {
+        ["X-Plex-Client-Identifier"] = clientId
+    };
 
-        var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
-        resp.EnsureSuccessStatusCode();
-        var xml = await resp.Content.ReadAsStringAsync(ct);
+    public async Task<PlexampSession?> GetPlexampSession(CancellationToken ct)
+    {
+        using HttpRequestMessage request = Clients.Http.HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/status/sessions", _headers);
 
-        var doc = XDocument.Parse(xml);
+        HttpResponseMessage response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+        response.EnsureSuccessStatusCode();
+        string xml = await response.Content.ReadAsStringAsync(ct);
+
+        XDocument doc = XDocument.Parse(xml);
 
         // Find a Plexamp session (prefer state="playing")
         var plexamp = doc.Descendants("Track")
@@ -55,20 +51,19 @@ public sealed class PlexApiClient(string plexBaseUrl, string plexToken)
 
         if (plexamp is null) return null;
 
-        var tr = plexamp.Track;
-        var player = tr.Element("Player");
+        XElement tr = plexamp.Track;
+        XElement? player = tr.Element("Player");
 
         string ratingKey = tr.Attribute("ratingKey")?.Value ?? "";
         string artist = tr.Attribute("grandparentTitle")?.Value ?? "";
         string album = tr.Attribute("parentTitle")?.Value ?? "";
         string title = tr.Attribute("title")?.Value ?? "";
-        int duration = int.TryParse(tr.Attribute("duration")?.Value, out var d) ? d : 0;
+        int duration = int.TryParse(tr.Attribute("duration")?.Value, out int d) ? d : 0;
 
         // Prefer <TranscodeSession time="..."> when present; fallback to viewOffset
-        int offset = 0;
-        var tcs = tr.Element("TranscodeSession");
-        if (!(tcs != null && int.TryParse(tcs.Attribute("time")?.Value, out offset)))
-            offset = int.TryParse(tr.Attribute("viewOffset")?.Value, out var o) ? o : 0;
+        XElement? tcs = tr.Element("TranscodeSession");
+        if (!(tcs != null && int.TryParse(tcs.Attribute("time")?.Value, out int offset)))
+            offset = int.TryParse(tr.Attribute("viewOffset")?.Value, out int o) ? o : 0;
 
         string state = plexamp.State;
         string clientUrl = player?.Attribute("address")?.Value ?? "";
@@ -85,7 +80,7 @@ public sealed class PlexApiClient(string plexBaseUrl, string plexToken)
         if (string.IsNullOrWhiteSpace(artist) && string.IsNullOrWhiteSpace(title))
             return null;
 
-        return new PlexNowPlayingResult(ratingKey, artist, album, title, offset, duration, state, clientUrl, clientId, artUrl);
+        return new PlexampSession(ratingKey, artist, album, title, offset, duration, state, clientUrl, clientId, artUrl);
     }
 
     /// <summary>
@@ -101,13 +96,9 @@ public sealed class PlexApiClient(string plexBaseUrl, string plexToken)
         if (string.IsNullOrWhiteSpace(clientId)) return false;
         if (offsetMs < 0) offsetMs = 0;
 
-        using var req = new HttpRequestMessage(HttpMethod.Get, $"{clientUrl}/player/playback/seekTo?offset={offsetMs}");
-        req.Headers.TryAddWithoutValidation("X-Plex-Token", plexToken);
-        req.Headers.TryAddWithoutValidation("X-Plex-Client-Identifier", clientId);
-        req.Headers.TryAddWithoutValidation("Cache-Control", "no-cache");
-
-        var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
-        return resp.IsSuccessStatusCode;
+        using HttpRequestMessage request = Clients.Http.HttpRequestMessage(HttpMethod.Get, $"{clientUrl}/player/playback/seekTo?offset={offsetMs}", _headersWithClientId(clientId));
+        HttpResponseMessage response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+        return response.IsSuccessStatusCode;
     }
 
     /// <summary>
@@ -116,7 +107,8 @@ public sealed class PlexApiClient(string plexBaseUrl, string plexToken)
     /// <param name="clientUrl">id of player client to control</param>
     /// <param name="clientId">id of player client to control</param>
     /// <param name="ct">cancellation token</param>
-    public Task<bool> PauseAsync(string clientUrl, string clientId, CancellationToken ct) => SendPlaybackCommandAsync(clientUrl, clientId, "pause", ct);
+    public Task<bool> PauseAsync(string clientUrl, string clientId, CancellationToken ct) =>
+        SendPlaybackCommandAsync(clientUrl, clientId, "pause", ct);
 
     /// <summary>
     /// Sends a play command to the specified Plex client.
@@ -124,7 +116,8 @@ public sealed class PlexApiClient(string plexBaseUrl, string plexToken)
     /// <param name="clientUrl">id of player client to control</param>
     /// <param name="clientId">id of player client to control</param>
     /// <param name="ct">cancellation token</param>
-    public Task<bool> PlayAsync(string clientUrl, string clientId, CancellationToken ct) => SendPlaybackCommandAsync(clientUrl, clientId, "play", ct);
+    public Task<bool> PlayAsync(string clientUrl, string clientId, CancellationToken ct) =>
+        SendPlaybackCommandAsync(clientUrl, clientId, "play", ct);
 
     /// <summary>
     /// Sends a skipNext command to the specified Plex client.
@@ -132,7 +125,8 @@ public sealed class PlexApiClient(string plexBaseUrl, string plexToken)
     /// <param name="clientUrl">id of player client to control</param>
     /// <param name="clientId">id of player client to control</param>
     /// <param name="ct">cancellation token</param>
-    public Task<bool> SkipNextAsync(string clientUrl, string clientId, CancellationToken ct) => SendPlaybackCommandAsync(clientUrl, clientId, "skipNext", ct);
+    public Task<bool> SkipNextAsync(string clientUrl, string clientId, CancellationToken ct) =>
+        SendPlaybackCommandAsync(clientUrl, clientId, "skipNext", ct);
 
     /// <summary>
     /// Send a skipPrevious command to the specified Plex client.
@@ -140,7 +134,8 @@ public sealed class PlexApiClient(string plexBaseUrl, string plexToken)
     /// <param name="clientUrl">id of player client to control</param>
     /// <param name="clientId">id of player client to control</param>
     /// <param name="ct">cancellation token</param>
-    public Task<bool> SkipPreviousAsync(string clientUrl, string clientId, CancellationToken ct) => SendPlaybackCommandAsync(clientUrl, clientId, "skipPrevious", ct);
+    public Task<bool> SkipPreviousAsync(string clientUrl, string clientId, CancellationToken ct) =>
+        SendPlaybackCommandAsync(clientUrl, clientId, "skipPrevious", ct);
 
     /// <summary>
     /// Sends a playback command (play/pause/skipNext/skipPrevious) to the specified Plex client.
@@ -149,17 +144,13 @@ public sealed class PlexApiClient(string plexBaseUrl, string plexToken)
     /// <param name="clientId">id of player client to control</param>
     /// <param name="command"></param>
     /// <param name="ct">cancellation token</param>
-    public async Task<bool> SendPlaybackCommandAsync(string clientUrl, string clientId, string command, CancellationToken ct)
+    private async Task<bool> SendPlaybackCommandAsync(string clientUrl, string clientId, string command, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(clientId)) return false;
 
-        using var req = new HttpRequestMessage(HttpMethod.Get, $"{clientUrl}/player/playback/{command}");
-        req.Headers.TryAddWithoutValidation("X-Plex-Token", plexToken);
-        req.Headers.TryAddWithoutValidation("X-Plex-Client-Identifier", clientId);
-        req.Headers.TryAddWithoutValidation("Cache-Control", "no-cache");
-
-        var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
-        return resp.IsSuccessStatusCode;
+        using HttpRequestMessage request = Clients.Http.HttpRequestMessage(HttpMethod.Get, $"{clientUrl}/player/playback/{command}", _headersWithClientId(clientId));
+        HttpResponseMessage response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+        return response.IsSuccessStatusCode;
     }
 
     /// <summary>
@@ -173,15 +164,11 @@ public sealed class PlexApiClient(string plexBaseUrl, string plexToken)
     {
         if (string.IsNullOrWhiteSpace(ratingKey)) return false;
 
-        using var req = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/library/metadata/{ratingKey}");
-        req.Headers.TryAddWithoutValidation("X-Plex-Token", plexToken);
-        req.Headers.TryAddWithoutValidation("Cache-Control", "no-cache");
-        req.Headers.TryAddWithoutValidation("Accept", "application/xml");
+        using HttpRequestMessage request = Clients.Http.HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/library/metadata/{ratingKey}", _headers);
+        HttpResponseMessage response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+        if (!response.IsSuccessStatusCode) return false;
 
-        var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
-        if (!resp.IsSuccessStatusCode) return false;
-
-        var xml = await resp.Content.ReadAsStringAsync(ct);
+        string xml = await response.Content.ReadAsStringAsync(ct);
         return xml.Contains("userRating=\"10.0\"", StringComparison.OrdinalIgnoreCase);
     }
 
@@ -192,18 +179,14 @@ public sealed class PlexApiClient(string plexBaseUrl, string plexToken)
     /// <param name="ratingKey">The track's Plex ratingKey (metadata id)</param>
     /// <param name="liked">true to like/heart, false to clear/unrate</param>
     /// <param name="ct">Cancellation token</param>
-    public async Task<bool> SetTrackLikedAsync(string ratingKey, bool liked, CancellationToken ct)
+    public async Task SetTrackLikedAsync(string ratingKey, bool liked, CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(ratingKey)) return false;
+        if (string.IsNullOrWhiteSpace(ratingKey)) return;
 
-        var rating = liked ? 10 : -1;
-        var url = $"{_baseUrl}/:/rate" + $"?key={Uri.EscapeDataString(ratingKey)}" + $"&identifier=com.plexapp.plugins.library" + $"&rating={rating}";
+        int rating = liked ? 10 : -1;
+        string requestUrl = $"{_baseUrl}/:/rate" + $"?key={Uri.EscapeDataString(ratingKey)}" + $"&identifier=com.plexapp.plugins.library" + $"&rating={rating}";
 
-        using var req = new HttpRequestMessage(HttpMethod.Put, url);
-        req.Headers.TryAddWithoutValidation("X-Plex-Token", plexToken);
-        req.Headers.TryAddWithoutValidation("Cache-Control", "no-cache");
-
-        var resp = await _http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
-        return resp.IsSuccessStatusCode;
+        using HttpRequestMessage request = Clients.Http.HttpRequestMessage(HttpMethod.Put, requestUrl, _headers);
+        await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
     }
 }

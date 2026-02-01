@@ -6,38 +6,28 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
+using PlexLyricSync.Models;
 
 namespace PlexLyricSync.Utils;
 
 public static class ConfigLoader
 {
-    public sealed class Config
-    {
-        public string PlexBaseUrl { get; set; } = "";
-        public string PlexToken { get; set; } = "";
-        public int SyncedLyricLines { get; set; } = 3;
-        public string LibreTranslateBaseUrl { get; set; } = "";
-        public string PreferredLanguage { get; set; } = "";
-        public bool UseSystemLanguage { get; set; } = true;
-        public bool EnableTranslations { get; set; }
-        public bool ShowTranslations { get; set; }
-    }
 
     private static string GetConfigPath()
     {
-        var music = Environment.GetFolderPath(Environment.SpecialFolder.MyMusic);
+        string music = Environment.GetFolderPath(Environment.SpecialFolder.MyMusic);
         return Path.Combine(music, "PlexLyricSync", "appsettings.config.yaml");
     }
 
     public static Config LoadExisting()
     {
-        var path = GetConfigPath();
+        string path = GetConfigPath();
         return File.Exists(path) ? Deserialize(path) : new Config();
     }
 
     public static void SaveConfig(Config cfg)
     {
-        var path = GetConfigPath();
+        string path = GetConfigPath();
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         File.WriteAllText(path,
             $"PlexBaseUrl: \"{cfg.PlexBaseUrl}\"{Environment.NewLine}" +
@@ -52,29 +42,29 @@ public static class ConfigLoader
 
     public static Config LoadConfigAsync()
     {
-        var path = GetConfigPath();
+        string path = GetConfigPath();
         return Deserialize(path);
     }
 
     public static async Task<Config> LoadConfigAsync(Window window)
     {
-        var path = GetConfigPath();
+        string path = GetConfigPath();
 
         // If config already exists, load it
         if (File.Exists(path))
             return Deserialize(path);
 
         // Ask user for configuration
-        var urlBox = new TextBox();
-        var tokenBox = new TextBox();
+        TextBox urlBox = new();
+        TextBox tokenBox = new();
 
-        var panel = new StackPanel();
+        StackPanel panel = new();
         panel.Children.Add(new TextBlock { Text = "Plex URL" });
         panel.Children.Add(urlBox);
         panel.Children.Add(new TextBlock { Text = "Plex Token" });
         panel.Children.Add(tokenBox);
 
-        var dialog = new ContentDialog
+        ContentDialog dialog = new()
         {
             Title = "Configure Plex",
             Content = panel,
@@ -83,13 +73,13 @@ public static class ConfigLoader
             XamlRoot = window.Content.XamlRoot
         };
 
-        var result = await dialog.ShowAsync();
+        ContentDialogResult result = await dialog.ShowAsync();
         if (result != ContentDialogResult.Primary)
         {
             return new Config();
         }
 
-        var config = new Config
+        Config config = new Config
         {
             PlexBaseUrl = urlBox.Text,
             PlexToken = tokenBox.Text
@@ -101,15 +91,12 @@ public static class ConfigLoader
 
     private static Config Deserialize(string path)
     {
-        var yaml = File.ReadAllText(path);
-        var deserializer = new DeserializerBuilder()
+        string yaml = File.ReadAllText(path);
+        IDeserializer deserializer = new DeserializerBuilder()
             .WithNamingConvention(PascalCaseNamingConvention.Instance)
             .Build();
 
-        var cfg = deserializer.Deserialize<Config>(yaml) ?? new Config();
-
-        // Backwards compatibility for configs written before new fields existed
-        cfg.PreferredLanguage ??= "";
+        Config cfg = deserializer.Deserialize<Config>(yaml);
 
         if (!yaml.Contains("UseSystemLanguage:", StringComparison.OrdinalIgnoreCase))
         {

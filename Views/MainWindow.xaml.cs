@@ -9,34 +9,35 @@ using Windows.Graphics;
 using Microsoft.UI.Xaml.Media.Animation;
 using PlexLyricSync.Clients;
 using PlexLyricSync.Utils;
+using PlexLyricSync.Models;
 
-namespace PlexLyricSync;
+namespace PlexLyricSync.Views;
 
-public sealed partial class MainWindow : Window
+public sealed partial class MainWindow
 {
-    private const int startWidth = 600, startHeight = 600;
+    private const int StartWidth = 600, StartHeight = 600;
 
-    internal string PlexBaseUrl = "";
-    internal string PlexToken = "";
+    private string _plexBaseUrl = "";
+    private string _plexToken = "";
 
-    internal PlexApiClient? _plex;
-    internal string _clientUrl = "";      // Plex player's machineIdentifier
-    internal string _clientId = "";       // Plex player's machineIdentifier
-    internal CancellationTokenSource? _pollCts;
+    internal PlexApiClient? Plex;
+    internal string ClientUrl = "";      // Plex player's machineIdentifier
+    internal string ClientId = "";       // Plex player's machineIdentifier
+    internal CancellationTokenSource? PollCts;
 
     // latest plex metadata
     private string _ratingKey = "", _artist = "", _album = "", _title = "", _albumArtUrl = "";
     private bool _trackLiked;
-    internal string _state = "";
-    internal int _durationMs = 0;
-    private int _viewOffsetMs = 0;
+    internal string State = "";
+    internal int DurationMs;
+    private int _viewOffsetMs;
 
     // prediction
-    internal int _predictedViewOffsetMs = 0;
-    internal DateTime _predictedViewOffsetUtc = DateTime.UtcNow;
+    internal int PredictedViewOffsetMs;
+    internal DateTime PredictedViewOffsetUtc = DateTime.UtcNow;
 
     // Display clock (predicted position between server ticks)
-    internal readonly DispatcherTimer _uiTimer = new() { Interval = TimeSpan.FromMilliseconds(200) };
+    internal readonly DispatcherTimer UiTimer = new() { Interval = TimeSpan.FromMilliseconds(200) };
     private readonly DispatcherTimer _controlsIdleTimer = new() { Interval = TimeSpan.FromSeconds(3) };
     private readonly DispatcherTimer _pointerStillTimer = new() { Interval = TimeSpan.FromMilliseconds(150) };
     private bool _controlsVisible;
@@ -45,8 +46,8 @@ public sealed partial class MainWindow : Window
     {
         InitializeComponent();
 
-        this.AppWindow.Resize(new SizeInt32(startWidth, startHeight));
-        if (this.AppWindow.Presenter is OverlappedPresenter p)
+        AppWindow.Resize(new SizeInt32(StartWidth, StartHeight));
+        if (AppWindow.Presenter is OverlappedPresenter p)
         {
             p.SetBorderAndTitleBar(true, false);
         }
@@ -62,10 +63,10 @@ public sealed partial class MainWindow : Window
         _controlsIdleTimer.Tick += ControlsIdleTimer_Tick;
         _pointerStillTimer.Tick += PointerStillTimer_Tick;
 
-        this.Closed += (_, __) =>
+        Closed += (_, _) =>
         {
-            _pollCts?.Cancel();
-            _uiTimer.Stop();
+            PollCts?.Cancel();
+            UiTimer.Stop();
             _controlsIdleTimer.Stop();
             _pointerStillTimer.Stop();
         };
@@ -86,41 +87,48 @@ public sealed partial class MainWindow : Window
 
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
-        // Ensure this only runs once
-        ((FrameworkElement)sender).Loaded -= MainWindow_Loaded;
+        try
+        {
+            // Ensure this only runs once
+            ((FrameworkElement)sender).Loaded -= MainWindow_Loaded;
 
-        NowPlaying.Text = "Connecting to Plex";
+            NowPlaying.Text = "Connecting to Plex";
 
-        await InitAsync();
+            await InitAsync();
+        }
+        catch
+        {
+            // ignored
+        }
     }
 
     internal async Task InitAsync()
     {
         // plex url and token from config file
-        var config = await ConfigLoader.LoadConfigAsync(this);
-        PlexBaseUrl = config.PlexBaseUrl;
-        PlexToken = config.PlexToken;
+        Config config = await ConfigLoader.LoadConfigAsync(this);
+        _plexBaseUrl = config.PlexBaseUrl;
+        _plexToken = config.PlexToken;
         LyricsView.SetSyncedLineCount(config.SyncedLyricLines);
         LyricsView.SetTranslationEnabled(config.EnableTranslations);
-        LyricsView.SetShowTranslations(config.SyncedLyricLines == 0 && config.ShowTranslations);
+        LyricsView.SetShowTranslations(config is { SyncedLyricLines: 0, ShowTranslations: true });
         LyricsView.SetPreferredLanguage(config.PreferredLanguage);
 
-        _plex = new PlexApiClient(PlexBaseUrl, PlexToken);
+        Plex = new PlexApiClient(_plexBaseUrl, _plexToken);
 
         // Start UI prediction (keeps the bar moving smoothly between Plex updates)
-        _uiTimer.Tick += (_, __) => ForecastTrackProgress();
-        _uiTimer.Start();
+        UiTimer.Tick += (_, _) => ForecastTrackProgress();
+        UiTimer.Start();
 
         // Kick an immediate poll and the background poll loop
-        _pollCts = new CancellationTokenSource();
-        await PollPlexAsync(_pollCts.Token);
-        _ = RunPollLoopAsync(_pollCts.Token);
+        PollCts = new CancellationTokenSource();
+        await PollPlexAsync(PollCts.Token);
+        _ = RunPollLoopAsync(PollCts.Token);
     }
 
     private async Task RunPollLoopAsync(CancellationToken ct)
     {
         // poll 5 times per second
-        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(200));
+        using PeriodicTimer timer = new(TimeSpan.FromMilliseconds(200));
         while (await timer.WaitForNextTickAsync(ct))
         {
             await PollPlexAsync(ct);
@@ -132,71 +140,71 @@ public sealed partial class MainWindow : Window
         try
         {
             DateTime now = DateTime.UtcNow;
-            var np = await _plex!.GetPlexampNowPlayingAsync(ct);
+            PlexampSession? session = await Plex!.GetPlexampSession(ct);
 
-            if (np is null)
+            if (session is null)
             {
-                _ratingKey = _artist = _album = _title = _albumArtUrl = _state = "";
-                _durationMs = 0;
+                _ratingKey = _artist = _album = _title = _albumArtUrl = State = "";
+                DurationMs = 0;
                 _viewOffsetMs = 0;
 
-                _predictedViewOffsetMs = 0;
-                _predictedViewOffsetUtc = now;
+                PredictedViewOffsetMs = 0;
+                PredictedViewOffsetUtc = now;
 
-                LyricsView._lrc = null;
+                LyricsView.Lrc = null;
                 LyricsView.SetNoLyrics("");
 
                 DispatcherQueue.TryEnqueue(UpdateTrackInformation);
                 return;
             }
 
-            var npTrackLiked = await _plex.GetTrackLikedAsync(np.RatingKey, ct);
+            bool npTrackLiked = await Plex.GetTrackLikedAsync(session.RatingKey, ct);
 
             // Capture client id for control (seek)
-            _clientUrl = "http://" + np.ClientUrl + ":32500" ?? _clientId;
-            _clientId = np.ClientId ?? _clientId;
+            ClientUrl = $"http://{session.ClientUrl}:32500";
+            ClientId = session.ClientId;
 
             // change detection
-            bool trackChanged = np.RatingKey != _ratingKey || np.Artist != _artist || np.Album != _album || np.Title != _title || npTrackLiked != _trackLiked || np.DurationMs != _durationMs || np.AlbumArtUrl != _albumArtUrl;
-            bool stateChanged = !np.State.Equals(_state, StringComparison.OrdinalIgnoreCase);
-            bool viewOffsetChanged = np.ViewOffsetMs != _viewOffsetMs;
+            bool trackChanged = session.RatingKey != _ratingKey || session.Artist != _artist || session.Album != _album || session.Title != _title || npTrackLiked != _trackLiked || session.DurationMs != DurationMs || session.AlbumArtUrl != _albumArtUrl;
+            bool stateChanged = !session.State.Equals(State, StringComparison.OrdinalIgnoreCase);
+            bool viewOffsetChanged = session.ViewOffsetMs != _viewOffsetMs;
 
             if (trackChanged || stateChanged || viewOffsetChanged)
             {
                 // track
-                _ratingKey = np.RatingKey;
-                _artist = np.Artist;
-                _album = np.Album;
-                _title = np.Title;
+                _ratingKey = session.RatingKey;
+                _artist = session.Artist;
+                _album = session.Album;
+                _title = session.Title;
                 _trackLiked = npTrackLiked;
-                _albumArtUrl = np.AlbumArtUrl;
-                _durationMs = np.DurationMs;
-                _state = np.State;
+                _albumArtUrl = session.AlbumArtUrl;
+                DurationMs = session.DurationMs;
+                State = session.State;
 
                 // viewOffset
-                _viewOffsetMs = np.ViewOffsetMs;
+                _viewOffsetMs = session.ViewOffsetMs;
 
                 // prediction
-                _predictedViewOffsetMs = _viewOffsetMs;
-                _predictedViewOffsetUtc = now;
+                PredictedViewOffsetMs = _viewOffsetMs;
+                PredictedViewOffsetUtc = now;
             }
 
             if (trackChanged)
             {
-                var trackKey = $"{_artist}|{_album}|{_title}|{_durationMs}";
+                string trackKey = $"{_artist}|{_album}|{_title}|{DurationMs}";
                 DispatcherQueue.TryEnqueue(UpdateTrackInformation);
-                await LyricsView.FetchLyricsAsync(_artist, _album, _title, _durationMs/1000, trackKey, ct).ConfigureAwait(false);
+                await LyricsView.FetchLyricsAsync(_artist, _album, _title, DurationMs/1000, trackKey, ct).ConfigureAwait(false);
                 await LyricsView.FetchTranslatedLyricsAsync(_artist, _album, _title, trackKey, ct).ConfigureAwait(false);
             }
         }
         catch (Exception ex)
         {
-            _artist = _album = _title = _albumArtUrl = _state = "";
-            _durationMs = 0;
+            _artist = _album = _title = _albumArtUrl = State = "";
+            DurationMs = 0;
             _viewOffsetMs = 0;
 
-            _predictedViewOffsetMs = 0;
-            _predictedViewOffsetUtc = DateTime.UtcNow;
+            PredictedViewOffsetMs = 0;
+            PredictedViewOffsetUtc = DateTime.UtcNow;
 
             LyricsView.SetNoLyrics("Unable to connect to Plex. Check server URL or token." + ex);
 
@@ -212,19 +220,19 @@ public sealed partial class MainWindow : Window
 
     internal void ForecastTrackProgress()
     {
-        if (_durationMs <= 0)
+        if (DurationMs <= 0)
         {
-            _predictedViewOffsetMs = 0;
+            PredictedViewOffsetMs = 0;
             UpdateTrackProgress();
             return;
         }
 
         DateTime now = DateTime.UtcNow;
-        int elapsed = (int)Math.Ceiling((now - _predictedViewOffsetUtc).TotalMilliseconds);
-        _predictedViewOffsetMs = _state.Equals("playing", StringComparison.OrdinalIgnoreCase)
-            ? Math.Clamp(_predictedViewOffsetMs + Math.Max(0, elapsed), 0, _durationMs)
-            : _predictedViewOffsetMs;
-        _predictedViewOffsetUtc = now;
+        int elapsed = (int)Math.Ceiling((now - PredictedViewOffsetUtc).TotalMilliseconds);
+        PredictedViewOffsetMs = State.Equals("playing", StringComparison.OrdinalIgnoreCase)
+            ? Math.Clamp(PredictedViewOffsetMs + Math.Max(0, elapsed), 0, DurationMs)
+            : PredictedViewOffsetMs;
+        PredictedViewOffsetUtc = now;
 
         UpdateTrackProgress();
     }
@@ -233,19 +241,21 @@ public sealed partial class MainWindow : Window
     {
         try
         {
-            if (_plex is null || string.IsNullOrWhiteSpace(_clientUrl) || string.IsNullOrWhiteSpace(_clientId)) return;
+            if (Plex is null || string.IsNullOrWhiteSpace(ClientUrl) || string.IsNullOrWhiteSpace(ClientId)) return;
 
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1.5));
-            var ok = await _plex.SeekToAsync(_clientUrl, _clientId, targetMs, cts.Token);
+            using CancellationTokenSource cts = new(TimeSpan.FromSeconds(1.5));
+            bool ok = await Plex.SeekToAsync(ClientUrl, ClientId, targetMs, cts.Token);
             if (!ok) return;
 
-            _predictedViewOffsetMs = targetMs;
-            _predictedViewOffsetUtc = DateTime.UtcNow;
+            PredictedViewOffsetMs = targetMs;
+            PredictedViewOffsetUtc = DateTime.UtcNow;
 
             DispatcherQueue.TryEnqueue(UpdateTrackProgress);
         }
         catch
-        { }
+        {
+            // ignored
+        }
     }
 
     /// <summary>
@@ -264,8 +274,8 @@ public sealed partial class MainWindow : Window
     /// </summary>
     internal void UpdateTrackProgress()
     {
-        ControlPanel.UpdateTrackInformation(_predictedViewOffsetMs, _durationMs, _state);
-        LyricsView.UpdateProgress(_predictedViewOffsetMs);
+        ControlPanel.UpdateTrackInformation(PredictedViewOffsetMs, DurationMs, State);
+        LyricsView.UpdateProgress(PredictedViewOffsetMs);
     }
 
     /// <summary>
@@ -282,7 +292,7 @@ public sealed partial class MainWindow : Window
     private void Window_PointerExited(object _, PointerRoutedEventArgs __)
     {
         if (!_controlsVisible) return;
-        ControlPanel.AnimateControls(ControlPanel._controlsHeight);
+        ControlPanel.AnimateControls(ControlPanel.ControlsHeight);
         _controlsVisible = false;
         _controlsIdleTimer.Stop();
         _pointerStillTimer.Stop();
@@ -307,7 +317,7 @@ public sealed partial class MainWindow : Window
     {
         _controlsIdleTimer.Stop();
         if (!_controlsVisible) return;
-        ControlPanel.AnimateControls(ControlPanel._controlsHeight);
+        ControlPanel.AnimateControls(ControlPanel.ControlsHeight);
         _controlsVisible = false;
     }
 
@@ -321,19 +331,26 @@ public sealed partial class MainWindow : Window
 
     private async void FavoriteButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_plex is null || string.IsNullOrWhiteSpace(_ratingKey)) return;
-
-        _trackLiked = !_trackLiked;
-
-        if (!_trackLiked)
+        try
         {
-            var sb = (Storyboard)FavRoot.Resources["UnfavoriteExplosion"];
-            sb.Stop();
-            sb.Begin();
-        }
+            if (Plex is null || string.IsNullOrWhiteSpace(_ratingKey)) return;
 
-        UpdateTrackInformation();
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1.5));
-        await _plex.SetTrackLikedAsync(_ratingKey, _trackLiked, cts.Token);
+            _trackLiked = !_trackLiked;
+
+            if (!_trackLiked)
+            {
+                Storyboard? sb = (Storyboard)FavRoot.Resources["UnfavoriteExplosion"];
+                sb.Stop();
+                sb.Begin();
+            }
+
+            UpdateTrackInformation();
+            using CancellationTokenSource cts = new(TimeSpan.FromSeconds(1.5));
+            await Plex.SetTrackLikedAsync(_ratingKey, _trackLiked, cts.Token);
+        }
+        catch
+        {
+            // ignored
+        }
     }
 }

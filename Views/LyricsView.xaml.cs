@@ -2,40 +2,42 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.UI;
+using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Input;
-using Microsoft.UI.Text;
-using Microsoft.UI.Xaml.Media;
-using Microsoft.UI;
 using Microsoft.UI.Xaml.Documents;
+using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using PlexLyricSync.Clients;
 using PlexLyricSync.Utils;
+using PlexLyricSync.Models;
 
-namespace PlexLyricSync;
+namespace PlexLyricSync.Views;
 
-public sealed partial class LyricsView : UserControl
+public sealed partial class LyricsView
 {
     public MainWindow? MainWindow { get; set; }
 
-    internal LyricsClient.LyricsData _lyrics;
-    internal List<LrcLine>? _lrc;
-    private List<LrcLine>? _translatedLrc;
-    internal string _trackKey = "";
-    internal int _curLyricIdx = -1;
-    private int _scrollOffset = 0;
+    internal Lyrics? Lyrics;
+    internal List<SyncedLyricLine>? Lrc;
+    private List<SyncedLyricLine>? _translatedLrc;
+    private string _trackKey = "";
+    internal int CurrentLyricIndex = -1;
+    private int _scrollOffset;
     private int _visibleLines = 3;
-    internal string? _localPath;
-    private readonly List<TextBlock> _syncedBlocks = new();
+    private string? _localPath;
+    private readonly List<TextBlock> _syncedBlocks = [];
     private string? _preferredLanguage;
     private bool _translationsEnabled = true;
     private bool _showTranslations = true;
 
     public LyricsView()
     {
-        this.InitializeComponent();
+        InitializeComponent();
 
         LySource.Tapped += OnLySourceTapped;
         LyUpdate.Click += OnLyUpdateClicked;
@@ -67,14 +69,14 @@ public sealed partial class LyricsView : UserControl
 
         for (int i = -_visibleLines; i <= _visibleLines; i++)
         {
-            var tb = new TextBlock
+            TextBlock tb = new()
             {
                 Foreground = new SolidColorBrush(Colors.White),
                 TextWrapping = TextWrapping.WrapWholeWords,
                 TextAlignment = TextAlignment.Center
             };
             int rel = i;
-            tb.Tapped += async (_, __) => await SeekToRelativeAsync(rel);
+            tb.Tapped += async (_, _) => await SeekToRelativeAsync(rel);
             _syncedBlocks.Add(tb);
             SyncedPanel.Children.Add(tb);
         }
@@ -98,7 +100,7 @@ public sealed partial class LyricsView : UserControl
     {
         _trackKey = trackKey;
         LyUpdate.Visibility = Visibility.Collapsed;
-        LyricsClient.LyricsData? local = null;
+        Lyrics? local = null;
 
         try
         {
@@ -108,12 +110,12 @@ public sealed partial class LyricsView : UserControl
         }
         catch
         {
-            if (_lrc is null) SetNoLyrics("An error occurred while attempting to grab lyrics locally.");
+            if (Lrc is null) SetNoLyrics("An error occurred while attempting to grab lyrics locally.");
         }
 
         try
         {
-            var remote = await LyricsClient.GetRemoteLyricsAsync(artist, album, title, duration, ct);  // get remote lyrics
+            Lyrics? remote = await LyricsClient.GetRemoteLyricsAsync(artist, album, title, duration, ct);  // get remote lyrics
             if (local is null)
             {
                 if (remote is not null) SetLyrics(trackKey, remote, false);                            // remote lyrics found
@@ -132,62 +134,61 @@ public sealed partial class LyricsView : UserControl
         }
         catch
         {
-            if (_lrc is null) SetNoLyrics("An error occurred while searching for lyrics.");
+            if (Lrc is null) SetNoLyrics("An error occurred while searching for lyrics.");
         }
     }
 
     public async Task FetchTranslatedLyricsAsync(string artist, string album, string title, string trackKey, CancellationToken ct)
     {
         // Translate lyrics in the background when enabled and a preferred language is set
-        if (_lyrics is not null && _translationsEnabled && !string.IsNullOrWhiteSpace(_preferredLanguage))
-        {
-            try
-            {
-                var lang = _preferredLanguage;
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        // Try to use cached translation first
-                        var existing = await LyricsClient.GetLocalTranslationAsync(artist, album, title, lang!, ct);
-                        var translated = existing ?? await LyricsClient.GetRemoteTranslationAsync(_lyrics, artist, album, title, lang!, ct);
-                        if (translated is null) return;
+        if (Lyrics is null || !_translationsEnabled || string.IsNullOrWhiteSpace(_preferredLanguage)) return;
 
-                        if (!string.IsNullOrWhiteSpace(translated.syncedLrc))
-                        {
-                            var parsedTranslated = LrcParser.Parse(translated.syncedLrc);
-                            DispatcherQueue.TryEnqueue(() =>
-                            {
-                                if (trackKey != _trackKey) return;
-                                _translatedLrc = parsedTranslated;
-                                if (!string.IsNullOrWhiteSpace(_lyrics.syncedLrc) && _lrc is not null)
-                                {
-                                    UpdateSyncedLyricStack(_curLyricIdx + _scrollOffset);
-                                }
-                            });
-                        }
-                        else if (!string.IsNullOrWhiteSpace(translated.plain))
-                        {
-                            var translatedPlain = translated.plain;
-                            DispatcherQueue.TryEnqueue(() =>
-                            {
-                                if (trackKey != _trackKey) return;
-                                if (!string.IsNullOrWhiteSpace(_lyrics.plain))
-                                {
-                                    PlainText.Text = CombinePlainWithTranslation(_lyrics.plain, translated.plain, _showTranslations);
-                                }
-                            });
-                        }
-                    }
-                    catch
-                    {
-                        // Ignore translation errors
-                    }
-                }, ct);
-            }
-            catch
+        try
+        {
+            string? lang = _preferredLanguage;
+            _ = Task.Run(async () =>
             {
-            }
+                try
+                {
+                    // Try to use cached translation first
+                    Lyrics? existing = await LibreTranslateClient.GetLocalTranslationAsync(artist, album, title, lang!, ct);
+                    Lyrics? translated = existing ?? await LibreTranslateClient.GetRemoteTranslationAsync(Lyrics, artist, album, title, lang!, ct);
+                    if (translated is null) return;
+
+                    if (!string.IsNullOrWhiteSpace(translated.Synced))
+                    {
+                        var parsedTranslated = LrcParser.Parse(translated.Synced);
+                        DispatcherQueue.TryEnqueue(() =>
+                        {
+                            if (trackKey != _trackKey) return;
+                            _translatedLrc = parsedTranslated;
+                            if (!string.IsNullOrWhiteSpace(Lyrics.Synced) && Lrc is not null)
+                            {
+                                UpdateSyncedLyricStack(CurrentLyricIndex + _scrollOffset);
+                            }
+                        });
+                    }
+                    else if (!string.IsNullOrWhiteSpace(translated.Plain))
+                    {
+                        DispatcherQueue.TryEnqueue(() =>
+                        {
+                            if (trackKey != _trackKey) return;
+                            if (!string.IsNullOrWhiteSpace(Lyrics.Plain))
+                            {
+                                PlainText.Text = CombinePlainWithTranslation(Lyrics.Plain, translated.Plain, _showTranslations);
+                            }
+                        });
+                    }
+                }
+                catch
+                {
+                    // ignored
+                }
+            }, ct);
+        }
+        catch
+        {
+            // ignored
         }
     }
 
@@ -197,28 +198,35 @@ public sealed partial class LyricsView : UserControl
     /// <param name="trackKey">track key</param>
     /// <param name="lyrics">track lyrics</param>
     /// <param name="local">true if lyrics are local</param>
-    private void SetLyrics(string trackKey, LyricsClient.LyricsData lyrics, bool local)
+    private void SetLyrics(string trackKey, Lyrics lyrics, bool local)
     {
-        _lyrics = lyrics;
+        Lyrics = lyrics;
         // updates lyrics source
         DispatcherQueue.TryEnqueue(() =>
         {
             if (trackKey != _trackKey) return;
-            _localPath = lyrics.path;
-            var idx = _localPath!.IndexOf("lyrics", StringComparison.OrdinalIgnoreCase);
-            var disp = idx >= 0 ? _localPath[idx..].Replace('\\', '/') : _localPath;
-            LySource.Text = local? "Local" : "Remote";
-            ToolTipService.SetToolTip(LySource, local? disp : null);
+
+            if (!local)
+            {
+                LySource.Text = "Remote";
+                return;
+            }
+
+            _localPath = lyrics.Path;
+            int idx = _localPath!.IndexOf("lyrics", StringComparison.OrdinalIgnoreCase);
+            string? disp = idx >= 0 ? _localPath[idx..].Replace('\\', '/') : _localPath;
+            LySource.Text = "Local";
+            ToolTipService.SetToolTip(LySource, disp);
         });
 
         // update synced lyrics
-        if (!string.IsNullOrWhiteSpace(lyrics.syncedLrc))
+        if (!string.IsNullOrWhiteSpace(lyrics.Synced))
         {
-            var parsed = LrcParser.Parse(lyrics.syncedLrc);
+            var parsed = LrcParser.Parse(lyrics.Synced);
             DispatcherQueue.TryEnqueue(() =>
             {
                 if (trackKey != _trackKey) return;
-                _lrc = parsed;
+                Lrc = parsed;
                 _translatedLrc = null;
                 _scrollOffset = 0;
                 SyncedPanel.Visibility = Visibility.Visible;
@@ -228,16 +236,16 @@ public sealed partial class LyricsView : UserControl
         }
 
         // update plain lyrics
-        else if (!string.IsNullOrWhiteSpace(lyrics.plain))
+        else if (!string.IsNullOrWhiteSpace(lyrics.Plain))
         {
             DispatcherQueue.TryEnqueue(() =>
             {
                 if (trackKey != _trackKey) return;
-                _lrc = null;
+                Lrc = null;
                 _translatedLrc = null;
                 SyncedPanel.Visibility = Visibility.Collapsed;
                 PlainScroll.Visibility = Visibility.Visible;
-                PlainText.Text = lyrics.plain;
+                PlainText.Text = lyrics.Plain;
                 PlainScroll.ChangeView(null, 0, null);
             });
         }
@@ -252,7 +260,7 @@ public sealed partial class LyricsView : UserControl
     {
         DispatcherQueue.TryEnqueue(() =>
         {
-            _lrc = null;
+            Lrc = null;
             _translatedLrc = null;
             SyncedPanel.Visibility = Visibility.Visible;
             PlainScroll.Visibility = Visibility.Collapsed;
@@ -271,25 +279,24 @@ public sealed partial class LyricsView : UserControl
     /// <param name="predictedViewOffsetMs">current view offset position</param>
     public void UpdateProgress(int predictedViewOffsetMs)
     {
-        if (_lyrics is null) return;
-        if (!string.IsNullOrWhiteSpace(_lyrics.syncedLrc) && _lrc is not null && _lrc.Count > 0)
+        if (Lyrics is null) return;
+        if (!string.IsNullOrWhiteSpace(Lyrics.Synced) && Lrc is not null && Lrc.Count > 0)
         {
-            var idx = LrcParser.IndexAt(_lrc, TimeSpan.FromMilliseconds(predictedViewOffsetMs));
-            if (idx != _curLyricIdx)
+            int idx = LrcParser.IndexAt(Lrc, TimeSpan.FromMilliseconds(predictedViewOffsetMs));
+            if (idx != CurrentLyricIndex)
             {
-                _curLyricIdx = idx;
+                CurrentLyricIndex = idx;
                 _scrollOffset = 0;
             }
-            UpdateSyncedLyricStack(_curLyricIdx + _scrollOffset);
+            UpdateSyncedLyricStack(CurrentLyricIndex + _scrollOffset);
         }
         else
         {
-            _curLyricIdx = -1;
-            if (!string.IsNullOrWhiteSpace(_lyrics.plain))
-            {
-                var cur = _syncedBlocks.Count > _visibleLines ? _syncedBlocks[_visibleLines].Text : "";
-                UpdateNonSyncedLyricStack(!string.IsNullOrWhiteSpace(_lyrics.syncedLrc) ? "" : cur);
-            }
+            if (string.IsNullOrWhiteSpace(Lyrics.Plain)) return;
+
+            CurrentLyricIndex = -1;
+            string? cur = _syncedBlocks.Count > _visibleLines ? _syncedBlocks[_visibleLines].Text : "";
+            UpdateNonSyncedLyricStack(!string.IsNullOrWhiteSpace(Lyrics.Synced) ? "" : cur);
         }
     }
 
@@ -299,11 +306,8 @@ public sealed partial class LyricsView : UserControl
     /// <param name="idx">the current lyric index</param>
     internal void UpdateSyncedLyricStack(int idx)
     {
-        string L(int i) => (_lrc is not null && i >= 0 && i < _lrc.Count) ? _lrc[i].Text : string.Empty;
-        string LT(int i) => (_translatedLrc is not null && i >= 0 && i < _translatedLrc.Count) ? _translatedLrc[i].Text : string.Empty;
-
         int highlightBlockIndex = -1;
-        int curPos = _curLyricIdx - idx;
+        int curPos = CurrentLyricIndex - idx;
         if (curPos >= -_visibleLines && curPos <= _visibleLines)
         {
             highlightBlockIndex = curPos + _visibleLines;
@@ -312,9 +316,9 @@ public sealed partial class LyricsView : UserControl
         for (int i = -_visibleLines; i <= _visibleLines; i++)
         {
             int idxBlock = i + _visibleLines;
-            var tb = _syncedBlocks[idxBlock];
-            var original = L(idx + i);
-            var translated = _showTranslations ? LT(idx + i) : string.Empty;
+            TextBlock tb = _syncedBlocks[idxBlock];
+            string original = L(idx + i);
+            string translated = _showTranslations ? LT(idx + i) : string.Empty;
 
             tb.Inlines.Clear();
             bool hasOriginal = !string.IsNullOrWhiteSpace(original);
@@ -329,7 +333,7 @@ public sealed partial class LyricsView : UserControl
 
             if (hasOriginal || !hasTranslated)
             {
-                var origRun = new Run
+                Run origRun = new()
                 {
                     Text = original,
                     FontWeight = isHighlight ? FontWeights.SemiBold : FontWeights.Normal,
@@ -341,7 +345,7 @@ public sealed partial class LyricsView : UserControl
             if (hasTranslated)
             {
                 tb.Inlines.Add(new LineBreak());
-                var transRun = new Run
+                Run transRun = new()
                 {
                     Text = translated,
                     FontWeight = FontWeights.Normal,
@@ -351,6 +355,11 @@ public sealed partial class LyricsView : UserControl
                 tb.Inlines.Add(transRun);
             }
         }
+
+        return;
+
+        string L(int i) => Lrc is not null && i >= 0 && i < Lrc.Count ? Lrc[i].Text : string.Empty;
+        string LT(int i) => _translatedLrc is not null && i >= 0 && i < _translatedLrc.Count ? _translatedLrc[i].Text : string.Empty;
     }
 
     /// <summary>
@@ -361,51 +370,54 @@ public sealed partial class LyricsView : UserControl
     {
         for (int i = 0; i < _syncedBlocks.Count; i++)
         {
-            var tb = _syncedBlocks[i];
+            TextBlock tb = _syncedBlocks[i];
             tb.Text = string.Empty;
             int dist = Math.Abs(i - _visibleLines);
             tb.FontSize = SizeFor(dist);
             tb.Opacity = OpacityFor(dist);
             tb.FontWeight = FontWeights.Normal;
         }
-        if (_syncedBlocks.Count > _visibleLines)
-        {
-            var center = _syncedBlocks[_visibleLines];
-            center.Text = lyrics;
-            center.FontSize = 22;
-            center.Opacity = 1.0;
-            center.FontWeight = FontWeights.SemiBold;
-        }
+
+        if (_syncedBlocks.Count <= _visibleLines) return;
+
+        TextBlock center = _syncedBlocks[_visibleLines];
+        center.Text = lyrics;
+        center.FontSize = 22;
+        center.Opacity = 1.0;
+        center.FontWeight = FontWeights.SemiBold;
     }
 
     private async Task SeekToRelativeAsync(int delta)
     {
         try
         {
-            if (_lrc is null || _lrc.Count == 0) return;
-            int baseIdx = _curLyricIdx + _scrollOffset;
+            if (Lrc is null || Lrc.Count == 0) return;
+            int baseIdx = CurrentLyricIndex + _scrollOffset;
             int targetIdx = baseIdx + delta;
-            if (targetIdx < 0 || targetIdx >= _lrc.Count) return;
+            if (targetIdx < 0 || targetIdx >= Lrc.Count) return;
 
-            int targetMs = (int)_lrc[targetIdx].T.TotalMilliseconds;
-            _curLyricIdx = targetIdx;
+            int targetMs = (int)Lrc[targetIdx].T.TotalMilliseconds;
+            CurrentLyricIndex = targetIdx;
             _scrollOffset = 0;
-            UpdateSyncedLyricStack(_curLyricIdx);
+            UpdateSyncedLyricStack(CurrentLyricIndex);
 
             if (MainWindow is not null) await MainWindow.SeekToMsAsync(targetMs);
         }
-        catch { }
+        catch
+        {
+            // ignored
+        }
     }
 
     private void OnSyncedScroll(object sender, PointerRoutedEventArgs e)
     {
-        if (_lrc is null || _lrc.Count == 0) return;
+        if (Lrc is null || Lrc.Count == 0) return;
         int delta = e.GetCurrentPoint(SyncedPanel).Properties.MouseWheelDelta;
         int dir = delta > 0 ? -1 : 1;
-        int maxUp = -_curLyricIdx;
-        int maxDown = _lrc.Count - 1 - _curLyricIdx;
+        int maxUp = -CurrentLyricIndex;
+        int maxDown = Lrc.Count - 1 - CurrentLyricIndex;
         _scrollOffset = Math.Clamp(_scrollOffset + dir, maxUp, maxDown);
-        UpdateSyncedLyricStack(_curLyricIdx + _scrollOffset);
+        UpdateSyncedLyricStack(CurrentLyricIndex + _scrollOffset);
         e.Handled = true;
     }
 
@@ -414,9 +426,9 @@ public sealed partial class LyricsView : UserControl
         _visibleLines = Math.Max(0, lines);
         RebuildSyncedBlocks();
 
-        if (_lyrics is null) return;
-        if (!string.IsNullOrWhiteSpace(_lyrics.syncedLrc) && _lrc is not null)
-            UpdateSyncedLyricStack(_curLyricIdx + _scrollOffset);
+        if (Lyrics is null) return;
+        if (!string.IsNullOrWhiteSpace(Lyrics.Synced) && Lrc is not null)
+            UpdateSyncedLyricStack(CurrentLyricIndex + _scrollOffset);
         else
             UpdateNonSyncedLyricStack(_syncedBlocks.Count > _visibleLines ? _syncedBlocks[_visibleLines].Text : "");
     }
@@ -431,7 +443,7 @@ public sealed partial class LyricsView : UserControl
         if (string.IsNullOrWhiteSpace(_localPath)) return;
         try
         {
-            var psi = new ProcessStartInfo
+            ProcessStartInfo psi = new()
             {
                 FileName = "explorer.exe",
                 Arguments = $"/select,\"{_localPath}\"",
@@ -439,7 +451,10 @@ public sealed partial class LyricsView : UserControl
             };
             Process.Start(psi);
         }
-        catch { }
+        catch
+        {
+            // ignored
+        }
     }
 
     /// <summary>
@@ -449,19 +464,22 @@ public sealed partial class LyricsView : UserControl
     /// <param name="e"></param>
     private async void OnLyUpdateClicked(object sender, RoutedEventArgs e)
     {
-        if (string.IsNullOrWhiteSpace(_localPath)) return;
         try
         {
-            var lyrics = await File.ReadAllTextAsync(_localPath);
-            LyricsClient.LyricsData local = _localPath.EndsWith(".lrc", StringComparison.OrdinalIgnoreCase)
-                ? new LyricsClient.LyricsData(lyrics, null, _localPath)
-                : new LyricsClient.LyricsData(null, lyrics, _localPath);
+            if (string.IsNullOrWhiteSpace(_localPath)) return;
+            string lyrics = await File.ReadAllTextAsync(_localPath);
+            Lyrics local = _localPath.EndsWith(".lrc", StringComparison.OrdinalIgnoreCase)
+                ? new Lyrics(lyrics, null, _localPath)
+                : new Lyrics(null, lyrics, _localPath);
             SetLyrics(_trackKey, local, true);
             _translatedLrc = null;
 
             LyUpdate.Visibility = Visibility.Collapsed;
         }
-        catch { }
+        catch
+        {
+            // ignored
+        }
     }
 
     private static string CombinePlainWithTranslation(string original, string translated, bool showTranslation)
@@ -469,15 +487,15 @@ public sealed partial class LyricsView : UserControl
         if (!showTranslation || string.IsNullOrWhiteSpace(translated))
             return original;
 
-        var originalLines = original.Replace("\r\n", "\n").Split('\n');
-        var translatedLines = translated.Replace("\r\n", "\n").Split('\n');
+        string[] originalLines = original.Replace("\r\n", "\n").Split('\n');
+        string[] translatedLines = translated.Replace("\r\n", "\n").Split('\n');
 
-        var sb = new System.Text.StringBuilder();
+        StringBuilder sb = new();
         int max = Math.Max(originalLines.Length, translatedLines.Length);
         for (int i = 0; i < max; i++)
         {
-            var o = i < originalLines.Length ? originalLines[i] : string.Empty;
-            var t = i < translatedLines.Length ? translatedLines[i] : string.Empty;
+            string o = i < originalLines.Length ? originalLines[i] : string.Empty;
+            string t = i < translatedLines.Length ? translatedLines[i] : string.Empty;
             if (!string.IsNullOrWhiteSpace(o))
             {
                 sb.AppendLine(o);

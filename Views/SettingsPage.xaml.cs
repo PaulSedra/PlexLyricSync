@@ -1,5 +1,4 @@
 using System;
-using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
@@ -7,16 +6,16 @@ using PlexLyricSync.Utils;
 
 namespace PlexLyricSync.Views;
 
-public sealed partial class SettingsPage : Page
+public sealed partial class SettingsPage
 {
     private MainWindow? _mainWindow;
     private ConfigLoader.Config _config = new();
-    private bool _loading = false;
+    private bool _loading;
     private readonly DispatcherTimer _debounceTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
 
     public SettingsPage()
     {
-        this.InitializeComponent();
+        InitializeComponent();
         _debounceTimer.Tick += DebounceTimer_Tick;
     }
 
@@ -71,33 +70,31 @@ public sealed partial class SettingsPage : Page
     private void PreferredLanguageChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_loading || _mainWindow is null) return;
+        if (PreferredLanguageBox.SelectedItem is not ComboBoxItem item) return;
 
-        if (PreferredLanguageBox.SelectedItem is ComboBoxItem item)
+        string? tag = item.Tag as string;
+        if (string.Equals(tag, "system", StringComparison.OrdinalIgnoreCase))
         {
-            var tag = item.Tag as string;
-            if (string.Equals(tag, "system", StringComparison.OrdinalIgnoreCase))
-            {
-                _config.UseSystemLanguage = true;
-                _config.PreferredLanguage = "";
-            }
-            else
-            {
-                _config.UseSystemLanguage = false;
-                _config.PreferredLanguage = tag ?? "";
-            }
-
-            ConfigLoader.SaveConfig(_config);
-
-            _debounceTimer.Stop();
-            _debounceTimer.Start();
+            _config.UseSystemLanguage = true;
+            _config.PreferredLanguage = "";
         }
+        else
+        {
+            _config.UseSystemLanguage = false;
+            _config.PreferredLanguage = tag ?? "";
+        }
+
+        ConfigLoader.SaveConfig(_config);
+
+        _debounceTimer.Stop();
+        _debounceTimer.Start();
     }
 
     private void DebounceTimer_Tick(object? sender, object e)
     {
         _debounceTimer.Stop();
         if (string.IsNullOrWhiteSpace(_config.PlexBaseUrl) || string.IsNullOrWhiteSpace(_config.PlexToken)) return;
-        UpdateConfigAsync(_config);
+        UpdateConfigAsync();
     }
 
     private void EnableTranslationsToggled(object sender, RoutedEventArgs e)
@@ -141,14 +138,13 @@ public sealed partial class SettingsPage : Page
         ShowTranslationsSwitch.IsOn = _config.ShowTranslations;
     }
 
-    private Task UpdateConfigAsync(ConfigLoader.Config config)
+    private void UpdateConfigAsync()
     {
-        if (_mainWindow is null)
-            return Task.CompletedTask;
+        if (_mainWindow is null) return;
 
-        _mainWindow._pollCts?.Cancel();
-        _mainWindow._uiTimer.Stop();
-        return _mainWindow.InitAsync();
+        _mainWindow.PollCts?.Cancel();
+        _mainWindow.UiTimer.Stop();
+        _ = _mainWindow.InitAsync();
     }
 
     private void BackButton_Click(object sender, RoutedEventArgs e)
@@ -161,13 +157,14 @@ public sealed partial class SettingsPage : Page
         PlexPanel.Visibility = Visibility.Collapsed;
         LyricsPanel.Visibility = Visibility.Collapsed;
 
-        if (NavTabs.SelectedIndex == 0)
+        switch (NavTabs.SelectedIndex)
         {
-            PlexPanel.Visibility = Visibility.Visible;
-        }
-        else if (NavTabs.SelectedIndex == 1)
-        {
-            LyricsPanel.Visibility = Visibility.Visible;
+            case 0:
+                PlexPanel.Visibility = Visibility.Visible;
+                break;
+            case 1:
+                LyricsPanel.Visibility = Visibility.Visible;
+                break;
         }
     }
 

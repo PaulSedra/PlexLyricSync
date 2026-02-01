@@ -2,35 +2,34 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
-using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media.Animation;
 using PlexLyricSync.Utils;
 
-namespace PlexLyricSync;
+namespace PlexLyricSync.Views;
 
-public sealed partial class PlayerControls : UserControl
+public sealed partial class PlayerControls
 {
     public MainWindow? MainWindow { get; set; }
     public LyricsView? LyricsView { get; set; }
 
-    private bool _isSeeking = false;     // true while user is dragging the progress bar
-    internal double _controlsHeight;
+    private bool _isSeeking;  // true while user is dragging the progress bar
+    internal double ControlsHeight;
     private double _controlsContentHeight;
-    private double _progressHeight = 6;
+    private const double ProgressHeight = 6;
     private const double ControlsHidePadding = 32;
     private const double ProgressSpacing = 14;
     private const double ProgressInsetPerSide = 16;
 
     public PlayerControls()
     {
-        this.InitializeComponent();
+        InitializeComponent();
 
-        ControlsContainer.Loaded += (_, __) =>
+        ControlsContainer.Loaded += (_, _) =>
         {
             _controlsContentHeight = ControlsContainer.ActualHeight;
-            _controlsHeight = _controlsContentHeight + ControlsHidePadding;
-            ControlsTranslate.Y = _controlsHeight;
+            ControlsHeight = _controlsContentHeight + ControlsHidePadding;
+            ControlsTranslate.Y = ControlsHeight;
             SongProgressScale.ScaleX = 1.0;
         };
     }
@@ -42,43 +41,45 @@ public sealed partial class PlayerControls : UserControl
     /// <param name="pointerEvent">the mouse pointer</param>
     private async Task SeekFromPointerAsync(FrameworkElement progressBar, PointerRoutedEventArgs pointerEvent)
     {
-        var mainWindow = MainWindow;
-        var lyricView = LyricsView;
+        MainWindow? mainWindow = MainWindow;
+        LyricsView? lyricView = LyricsView;
         if (mainWindow is null) return;
         try
         {
-            if (mainWindow._plex is null || string.IsNullOrWhiteSpace(mainWindow._clientUrl) || string.IsNullOrWhiteSpace(mainWindow._clientId)) return;
-            if (mainWindow._durationMs <= 0) return;
+            if (mainWindow.Plex is null || string.IsNullOrWhiteSpace(mainWindow.ClientUrl) || string.IsNullOrWhiteSpace(mainWindow.ClientId)) return;
+            if (mainWindow.DurationMs <= 0) return;
 
             double x = pointerEvent.GetCurrentPoint(progressBar).Position.X;
             double fraction = progressBar.ActualWidth > 0 ? x / progressBar.ActualWidth : 0;
             fraction = Math.Clamp(fraction, 0, 1);
-            int targetMs = (int)(mainWindow._durationMs * fraction);
+            int targetMs = (int)(mainWindow.DurationMs * fraction);
 
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1.5));
+            using CancellationTokenSource cts = new(TimeSpan.FromSeconds(1.5));
             if (!_isSeeking)
             {
-                var ok = await mainWindow._plex.SeekToAsync(mainWindow._clientUrl, mainWindow._clientId, targetMs, cts.Token);
+                bool ok = await mainWindow.Plex.SeekToAsync(mainWindow.ClientUrl, mainWindow.ClientId, targetMs, cts.Token);
                 if (!ok) return;
             }
 
-            mainWindow._predictedViewOffsetMs = targetMs;
-            mainWindow._predictedViewOffsetUtc = DateTime.UtcNow;
+            mainWindow.PredictedViewOffsetMs = targetMs;
+            mainWindow.PredictedViewOffsetUtc = DateTime.UtcNow;
 
-            if (!string.IsNullOrWhiteSpace(lyricView!._lyrics.syncedLrc) && lyricView._lrc is not null && lyricView._lrc.Count > 0)
-                lyricView._curLyricIdx = LrcParser.IndexAt(lyricView._lrc, TimeSpan.FromMilliseconds(targetMs));
+            if (!string.IsNullOrWhiteSpace(lyricView!.Lyrics?.SyncedLrc) && lyricView.Lrc is not null && lyricView.Lrc.Count > 0)
+                lyricView.CurrentLyricIndex = LrcParser.IndexAt(lyricView.Lrc, TimeSpan.FromMilliseconds(targetMs));
             else
-                lyricView._curLyricIdx = -1;
+                lyricView.CurrentLyricIndex = -1;
 
             mainWindow.DispatcherQueue.TryEnqueue(() =>
             {
                 mainWindow.UpdateTrackProgress();
-                if (!string.IsNullOrWhiteSpace(lyricView!._lyrics.syncedLrc) && lyricView._lrc is not null && lyricView._lrc.Count > 0)
-                    lyricView.UpdateSyncedLyricStack(lyricView._curLyricIdx);
+                if (!string.IsNullOrWhiteSpace(lyricView.Lyrics?.SyncedLrc) && lyricView.Lrc is not null && lyricView.Lrc.Count > 0)
+                    lyricView.UpdateSyncedLyricStack(lyricView.CurrentLyricIndex);
             });
         }
         catch
-        { }
+        {
+            // ignored
+        }
     }
 
     /// <summary>
@@ -89,12 +90,19 @@ public sealed partial class PlayerControls : UserControl
     /// <param name="pointerEvent">the mouse pointer</param>
     private async void SongProgress_PointerPressed(object sender, PointerRoutedEventArgs pointerEvent)
     {
-        var mainWindow = MainWindow;
-        if (mainWindow is null) return;
-        _isSeeking = true;
-        var progressBar = (FrameworkElement)sender;
-        progressBar.CapturePointer(pointerEvent.Pointer);
-        await SeekFromPointerAsync(progressBar, pointerEvent);
+        try
+        {
+            MainWindow? mainWindow = MainWindow;
+            if (mainWindow is null) return;
+            _isSeeking = true;
+            FrameworkElement progressBar = (FrameworkElement)sender;
+            progressBar.CapturePointer(pointerEvent.Pointer);
+            await SeekFromPointerAsync(progressBar, pointerEvent);
+        }
+        catch
+        {
+            // ignored
+        }
     }
 
     /// <summary>
@@ -105,10 +113,17 @@ public sealed partial class PlayerControls : UserControl
     /// <param name="pointerEvent">the mouse pointer</param>
     private async void SongProgress_PointerMoved(object sender, PointerRoutedEventArgs pointerEvent)
     {
-        var mainWindow = MainWindow;
-        if (mainWindow is null || !_isSeeking) return;
-        var progressBar = (FrameworkElement)sender;
-        await SeekFromPointerAsync(progressBar, pointerEvent);
+        try
+        {
+            MainWindow? mainWindow = MainWindow;
+            if (mainWindow is null || !_isSeeking) return;
+            FrameworkElement progressBar = (FrameworkElement)sender;
+            await SeekFromPointerAsync(progressBar, pointerEvent);
+        }
+        catch
+        {
+            // ignored
+        }
     }
 
     /// <summary>
@@ -119,12 +134,19 @@ public sealed partial class PlayerControls : UserControl
     /// <param name="pointerEvent">the mouse pointer</param>
     private async void SongProgress_PointerReleased(object sender, PointerRoutedEventArgs pointerEvent)
     {
-        var mainWindow = MainWindow;
-        if (mainWindow is null || !_isSeeking) return;
-        _isSeeking = false;
-        var progressBar = (FrameworkElement)sender;
-        progressBar.ReleasePointerCaptures();
-        await SeekFromPointerAsync(progressBar, pointerEvent);
+        try
+        {
+            MainWindow? mainWindow = MainWindow;
+            if (mainWindow is null || !_isSeeking) return;
+            _isSeeking = false;
+            FrameworkElement progressBar = (FrameworkElement)sender;
+            progressBar.ReleasePointerCaptures();
+            await SeekFromPointerAsync(progressBar, pointerEvent);
+        }
+        catch
+        {
+            // ignored
+        }
     }
 
     private void SettingsButton_Click(object sender, RoutedEventArgs e)
@@ -134,62 +156,79 @@ public sealed partial class PlayerControls : UserControl
 
     private async void PlayPauseButton_Click(object sender, RoutedEventArgs e)
     {
-        var mainWindow = MainWindow;
-        if (mainWindow is null) return;
         try
         {
-            if (mainWindow._plex is null || string.IsNullOrWhiteSpace(mainWindow._clientUrl) || string.IsNullOrWhiteSpace(mainWindow._clientId)) return;
+            MainWindow? mainWindow = MainWindow;
+            if (mainWindow?.Plex is null || string.IsNullOrWhiteSpace(mainWindow.ClientUrl) || string.IsNullOrWhiteSpace(mainWindow.ClientId)) return;
 
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1.5));
+            using CancellationTokenSource cts = new(TimeSpan.FromSeconds(1.5));
             bool ok;
-            if (mainWindow._state.Equals("playing", StringComparison.OrdinalIgnoreCase))
+            if (mainWindow.State.Equals("playing", StringComparison.OrdinalIgnoreCase))
             {
                 mainWindow.ForecastTrackProgress();
-                ok = await mainWindow._plex.PauseAsync(mainWindow._clientUrl, mainWindow._clientId, cts.Token);
+                ok = await mainWindow.Plex.PauseAsync(mainWindow.ClientUrl, mainWindow.ClientId, cts.Token);
                 if (!ok) return;
-                mainWindow._state = "paused";
+                mainWindow.State = "paused";
             }
             else
             {
-                ok = await mainWindow._plex.PlayAsync(mainWindow._clientUrl, mainWindow._clientId, cts.Token);
+                ok = await mainWindow.Plex.PlayAsync(mainWindow.ClientUrl, mainWindow.ClientId, cts.Token);
                 if (!ok) return;
-                mainWindow._state = "playing";
-                mainWindow._predictedViewOffsetUtc = DateTime.UtcNow;
+                mainWindow.State = "playing";
+                mainWindow.PredictedViewOffsetUtc = DateTime.UtcNow;
             }
             
             mainWindow.DispatcherQueue.TryEnqueue(mainWindow.UpdateTrackProgress);
         }
         catch
-        {}
+        {
+            // ignored
+        }
     }
 
     private async void NextButton_Click(object sender, RoutedEventArgs e)
     {
-        await SkipAsync(true);
-        MainWindow?.Root.Focus(FocusState.Programmatic);
+        try
+        {
+            await SkipAsync(true);
+            MainWindow?.Root.Focus(FocusState.Programmatic);
+        }
+        catch
+        {
+            // ignored
+        }
     }
 
     private async void PreviousButton_Click(object sender, RoutedEventArgs e)
     {
-        await SkipAsync(false);
-        MainWindow?.Root.Focus(FocusState.Programmatic);
+        try
+        {
+            await SkipAsync(false);
+            MainWindow?.Root.Focus(FocusState.Programmatic);
+        }
+        catch
+        {
+            // ignored
+        }
     }
 
     private async Task SkipAsync(bool forward)
     {
-        var mainWindow = MainWindow;
+        MainWindow? mainWindow = MainWindow;
         if (mainWindow is null) return;
         try
         {
-            if (mainWindow._plex is null || string.IsNullOrWhiteSpace(mainWindow._clientUrl) || string.IsNullOrWhiteSpace(mainWindow._clientId)) return;
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1.5));
+            if (mainWindow.Plex is null || string.IsNullOrWhiteSpace(mainWindow.ClientUrl) || string.IsNullOrWhiteSpace(mainWindow.ClientId)) return;
+            using CancellationTokenSource cts = new(TimeSpan.FromSeconds(1.5));
             if (forward)
-                await mainWindow._plex.SkipNextAsync(mainWindow._clientUrl, mainWindow._clientId, cts.Token);
+                await mainWindow.Plex.SkipNextAsync(mainWindow.ClientUrl, mainWindow.ClientId, cts.Token);
             else
-                await mainWindow._plex.SkipPreviousAsync(mainWindow._clientUrl, mainWindow._clientId, cts.Token);
+                await mainWindow.Plex.SkipPreviousAsync(mainWindow.ClientUrl, mainWindow.ClientId, cts.Token);
         }
         catch
-        { }
+        {
+            // ignored
+        }
     }
 
     public void UpdateTrackInformation(double predictedViewOffsetMs, double durationMs, string state)
@@ -203,7 +242,7 @@ public sealed partial class PlayerControls : UserControl
 
     private static string FormatTime(double ms)
     {
-        var ts = TimeSpan.FromMilliseconds(ms);
+        TimeSpan ts = TimeSpan.FromMilliseconds(ms);
         return $"{(int)ts.TotalMinutes:D2}:{ts.Seconds:D2}";
     }
 
@@ -213,11 +252,11 @@ public sealed partial class PlayerControls : UserControl
     /// <param name="pixels">number of pixels to translate element</param>
     public void AnimateControls(double pixels)
     {
-        var sb = new Storyboard();
+        Storyboard sb = new();
         bool showing = pixels == 0;
-        var easing = new CubicEase { EasingMode = showing ? EasingMode.EaseOut : EasingMode.EaseIn };
+        CubicEase easing = new() { EasingMode = showing ? EasingMode.EaseOut : EasingMode.EaseIn };
 
-        var anim = new DoubleAnimation
+        DoubleAnimation anim = new()
         {
             To = pixels,
             Duration = TimeSpan.FromMilliseconds(400),
@@ -226,28 +265,28 @@ public sealed partial class PlayerControls : UserControl
         Storyboard.SetTarget(anim, ControlsTranslate);
         Storyboard.SetTargetProperty(anim, "Y");
 
-        var SongProgressTranslateAnimation = new DoubleAnimation
+        DoubleAnimation songProgressTranslateAnimation = new()
         {
-            To = showing ? - (_controlsContentHeight + ProgressSpacing + _progressHeight) : 0,
+            To = showing ? - (_controlsContentHeight + ProgressSpacing + ProgressHeight) : 0,
             Duration = TimeSpan.FromMilliseconds(400),
             EasingFunction = easing
         };
-        Storyboard.SetTarget(SongProgressTranslateAnimation, SongProgressTranslate);
-        Storyboard.SetTargetProperty(SongProgressTranslateAnimation, "Y");
+        Storyboard.SetTarget(songProgressTranslateAnimation, SongProgressTranslate);
+        Storyboard.SetTargetProperty(songProgressTranslateAnimation, "Y");
 
         double scaleTarget = showing ? ComputeShownScale() : 1.0;
-        var SongProgressScaleAnimation = new DoubleAnimation
+        DoubleAnimation songProgressScaleAnimation = new()
         {
             To = scaleTarget,
             Duration = TimeSpan.FromMilliseconds(400),
             EasingFunction = easing
         };
-        Storyboard.SetTarget(SongProgressScaleAnimation, SongProgressScale);
-        Storyboard.SetTargetProperty(SongProgressScaleAnimation, "ScaleX");
+        Storyboard.SetTarget(songProgressScaleAnimation, SongProgressScale);
+        Storyboard.SetTargetProperty(songProgressScaleAnimation, "ScaleX");
 
         sb.Children.Add(anim);
-        sb.Children.Add(SongProgressTranslateAnimation);
-        sb.Children.Add(SongProgressScaleAnimation);
+        sb.Children.Add(songProgressTranslateAnimation);
+        sb.Children.Add(songProgressScaleAnimation);
         sb.Begin();
     }
 
