@@ -12,9 +12,9 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Documents;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
-using PlexLyricSync.Clients;
-using PlexLyricSync.Utils;
-using PlexLyricSync.Models;
+using PlexLyricSync.Core.Clients;
+using PlexLyricSync.Core.Utils;
+using PlexLyricSync.Core.Models;
 
 namespace PlexLyricSync.Views;
 
@@ -151,8 +151,9 @@ public sealed partial class LyricsView
                 try
                 {
                     // Try to use cached translation first
+                    LibreTranslateClient libreTransalteClient = MainWindow!.LibreTranslateClient!;
                     Lyrics? existing = await LibreTranslateClient.GetLocalTranslationAsync(artist, album, title, lang!, ct);
-                    Lyrics? translated = existing ?? await LibreTranslateClient.GetRemoteTranslationAsync(Lyrics, artist, album, title, lang!, ct);
+                    Lyrics? translated = existing ?? await libreTransalteClient.GetRemoteTranslationAsync(Lyrics, artist, album, title, lang!, ct);
                     if (translated is null) return;
 
                     if (!string.IsNullOrWhiteSpace(translated.Synced))

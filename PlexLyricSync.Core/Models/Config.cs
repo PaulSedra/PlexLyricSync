@@ -1,4 +1,4 @@
-namespace PlexLyricSync.Models;
+﻿namespace PlexLyricSync.Core.Models;
 
 public sealed record Config
 {

@@ -6,7 +6,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
-using PlexLyricSync.Models;
+using PlexLyricSync.Core.Models;
 
 namespace PlexLyricSync.Utils;
 

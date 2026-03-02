@@ -3,10 +3,10 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using PlexLyricSync.Models;
-using PlexLyricSync.Utils;
+using PlexLyricSync.Core.Models;
+using PlexLyricSync.Core.Utils;
 
-namespace PlexLyricSync.Clients;
+namespace PlexLyricSync.Core.Clients;
 
 public static class LyricsClient
 {

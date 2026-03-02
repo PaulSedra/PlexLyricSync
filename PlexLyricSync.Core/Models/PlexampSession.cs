@@ -1,6 +1,6 @@
-﻿namespace PlexLyricSync.Models;
+﻿namespace PlexLyricSync.Core.Models;
 
-public record PlexNowPlayingResult(
+public sealed record PlexampSession(
     string RatingKey,
     string Artist,
     string Album,

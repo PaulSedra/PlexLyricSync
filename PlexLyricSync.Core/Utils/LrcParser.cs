@@ -6,9 +6,9 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using PlexLyricSync.Models;
+using PlexLyricSync.Core.Models;
 
-namespace PlexLyricSync.Utils;
+namespace PlexLyricSync.Core.Utils;
 
 public static class LrcParser
 {

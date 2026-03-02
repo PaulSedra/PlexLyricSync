@@ -3,10 +3,10 @@ using System.Net.Http;
 using System.Net.Http.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using PlexLyricSync.Utils;
-using PlexLyricSync.Models;
+using PlexLyricSync.Core.Utils;
+using PlexLyricSync.Core.Models;
 
-namespace PlexLyricSync.Clients;
+namespace PlexLyricSync.Core.Clients;
 
 public sealed class LibreTranslateClient(string libreTranslateBaseUrl)
 {
@@ -74,14 +74,13 @@ public sealed class LibreTranslateClient(string libreTranslateBaseUrl)
     /// <param name="targetLanguage">target language for translation</param>
     /// <param name="ct">cancellation token</param>
     /// <returns>LyricsData (optional): remote translated lyrics if found</returns>
-    public static async Task<Lyrics?> GetRemoteTranslationAsync(Lyrics lyrics, string artist, string album, string title, string targetLanguage, CancellationToken ct)
+    public async Task<Lyrics?> GetRemoteTranslationAsync(Lyrics lyrics, string artist, string album, string title, string targetLanguage, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(targetLanguage)) return null;
 
         Lyrics? translatedLyrics = null;
 
-        Config config = ConfigLoader.LoadConfigAsync();
-        LibreTranslateClient libreTranslateClient = new(config.LibreTranslateBaseUrl);
+        LibreTranslateClient libreTranslateClient = new(_libreTranslateBaseUrl);
 
         // synced lyrics translation
         if (!string.IsNullOrWhiteSpace(lyrics.Synced))

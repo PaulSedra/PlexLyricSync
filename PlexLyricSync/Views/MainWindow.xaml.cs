@@ -7,9 +7,9 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.Graphics;
 using Microsoft.UI.Xaml.Media.Animation;
-using PlexLyricSync.Clients;
+using PlexLyricSync.Core.Clients;
 using PlexLyricSync.Utils;
-using PlexLyricSync.Models;
+using PlexLyricSync.Core.Models;
 
 namespace PlexLyricSync.Views;
 
@@ -21,6 +21,7 @@ public sealed partial class MainWindow
     private string _plexToken = "";
 
     internal PlexApiClient? Plex;
+    internal LibreTranslateClient? LibreTranslateClient;
     internal string ClientUrl = "";      // Plex player's machineIdentifier
     internal string ClientId = "";       // Plex player's machineIdentifier
     internal CancellationTokenSource? PollCts;
@@ -114,6 +115,7 @@ public sealed partial class MainWindow
         LyricsView.SetPreferredLanguage(config.PreferredLanguage);
 
         Plex = new PlexApiClient(_plexBaseUrl, _plexToken);
+        LibreTranslateClient = new LibreTranslateClient(config.LibreTranslateBaseUrl);
 
         // Start UI prediction (keeps the bar moving smoothly between Plex updates)
         UiTimer.Tick += (_, _) => ForecastTrackProgress();

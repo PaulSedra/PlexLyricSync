@@ -5,9 +5,9 @@ using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
-using PlexLyricSync.Models;
+using PlexLyricSync.Core.Models;
 
-namespace PlexLyricSync.Clients;
+namespace PlexLyricSync.Core.Clients;
 
 public sealed class PlexApiClient(string plexBaseUrl, string plexToken)
 {

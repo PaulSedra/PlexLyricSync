@@ -3,13 +3,14 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Navigation;
 using PlexLyricSync.Utils;
+using PlexLyricSync.Core.Models;
 
 namespace PlexLyricSync.Views;
 
 public sealed partial class SettingsPage
 {
     private MainWindow? _mainWindow;
-    private ConfigLoader.Config _config = new();
+    private Config _config = new();
     private bool _loading;
     private readonly DispatcherTimer _debounceTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
 
