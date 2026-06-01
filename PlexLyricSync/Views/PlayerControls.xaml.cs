@@ -64,7 +64,7 @@ public sealed partial class PlayerControls
             mainWindow.PredictedViewOffsetMs = targetMs;
             mainWindow.PredictedViewOffsetUtc = DateTime.UtcNow;
 
-            if (!string.IsNullOrWhiteSpace(lyricView!.Lyrics?.Synced) && lyricView.Lrc is not null && lyricView.Lrc.Count > 0)
+            if (!string.IsNullOrWhiteSpace(lyricView!.LyricsFile?.Synced) && lyricView.Lrc is not null && lyricView.Lrc.Count > 0)
                 lyricView.CurrentLyricIndex = LrcParser.IndexAt(lyricView.Lrc, TimeSpan.FromMilliseconds(targetMs));
             else
                 lyricView.CurrentLyricIndex = -1;
@@ -72,7 +72,7 @@ public sealed partial class PlayerControls
             mainWindow.DispatcherQueue.TryEnqueue(() =>
             {
                 mainWindow.UpdateTrackProgress();
-                if (!string.IsNullOrWhiteSpace(lyricView.Lyrics?.Synced) && lyricView.Lrc is not null && lyricView.Lrc.Count > 0)
+                if (!string.IsNullOrWhiteSpace(lyricView.LyricsFile?.Synced) && lyricView.Lrc is not null && lyricView.Lrc.Count > 0)
                     lyricView.UpdateSyncedLyricStack(lyricView.CurrentLyricIndex);
             });
         }

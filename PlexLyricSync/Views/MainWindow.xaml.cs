@@ -21,7 +21,6 @@ public sealed partial class MainWindow
     private string _plexToken = "";
 
     internal PlexApiClient? Plex;
-    internal LibreTranslateClient? LibreTranslateClient;
     internal string ClientUrl = "";      // Plex player's machineIdentifier
     internal string ClientId = "";       // Plex player's machineIdentifier
     internal CancellationTokenSource? PollCts;
@@ -110,12 +109,9 @@ public sealed partial class MainWindow
         _plexBaseUrl = config.PlexBaseUrl;
         _plexToken = config.PlexToken;
         LyricsView.SetSyncedLineCount(config.SyncedLyricLines);
-        LyricsView.SetTranslationEnabled(config.EnableTranslations);
-        LyricsView.SetShowTranslations(config is { SyncedLyricLines: 0, ShowTranslations: true });
-        LyricsView.SetPreferredLanguage(config.PreferredLanguage);
+        LyricsView.SetShowJapaneseTransliteration(config.ShowJapaneseTransliteration);
 
         Plex = new PlexApiClient(_plexBaseUrl, _plexToken);
-        LibreTranslateClient = new LibreTranslateClient(config.LibreTranslateBaseUrl);
 
         // Start UI prediction (keeps the bar moving smoothly between Plex updates)
         UiTimer.Tick += (_, _) => ForecastTrackProgress();
@@ -196,7 +192,7 @@ public sealed partial class MainWindow
                 string trackKey = $"{_artist}|{_album}|{_title}|{DurationMs}";
                 DispatcherQueue.TryEnqueue(UpdateTrackInformation);
                 await LyricsView.FetchLyricsAsync(_artist, _album, _title, DurationMs/1000, trackKey, ct).ConfigureAwait(false);
-                await LyricsView.FetchTranslatedLyricsAsync(_artist, _album, _title, trackKey, ct).ConfigureAwait(false);
+                await LyricsView.FetchTransliteratedLyricsAsync(_artist, _album, _title, trackKey, ct).ConfigureAwait(false);
             }
         }
         catch (Exception ex)

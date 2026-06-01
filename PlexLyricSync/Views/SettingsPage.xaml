@@ -29,33 +29,10 @@
                         SpinButtonPlacementMode="Inline"
                         SmallChange="1"
                         ValueChanged="SyncedLinesChanged"/>
-                    <TextBox x:Name="LibreTranslateBaseUrlBox" Header="LibreTranslate URL" TextChanged="SettingChanged"/>
-                    <StackPanel x:Name="AdditionalTranslationOptionsContainer">
-                        <ComboBox
-                            x:Name="PreferredLanguageBox"
-                            Header="Preferred lyrics language"
-                            SelectionChanged="PreferredLanguageChanged">
-                                <ComboBoxItem Content="System default" Tag="system"/>
-                                <ComboBoxItem Content="English" Tag="en"/>
-                                <ComboBoxItem Content="Spanish" Tag="es"/>
-                                <ComboBoxItem Content="French" Tag="fr"/>
-                                <ComboBoxItem Content="German" Tag="de"/>
-                                <ComboBoxItem Content="Japanese" Tag="ja"/>
-                                <ComboBoxItem Content="Korean" Tag="ko"/>
-                                <ComboBoxItem Content="Chinese (Simplified)" Tag="zh"/>
-                        </ComboBox>
-                        <ToggleSwitch
-                            x:Name="EnableTranslationsSwitch"
-                            Header="Enable translations (create translated files)"
-                            Toggled="EnableTranslationsToggled"/>
-                        <Grid x:Name="ShowTranslationsContainer"> <!-- the following Grid and TextBlock are necessary in order to enable tooltip when switch is disabled -->
-                            <TextBlock />
-                            <ToggleSwitch
-                                x:Name="ShowTranslationsSwitch"
-                                Header="Show translations"
-                                Toggled="ShowTranslationsToggled"/>
-                        </Grid>
-                    </StackPanel>
+                    <ToggleSwitch
+                        x:Name="ShowJapaneseTransliterationSwitch"
+                        Header="Show Japanese transliteration"
+                        Toggled="ShowJapaneseTransliterationToggled"/>
                 </StackPanel>
 
                 <Button Content="Back" HorizontalAlignment="Right" Click="BackButton_Click"/>

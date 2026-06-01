@@ -7,11 +7,15 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using PlexLyricSync.Core.Models;
+using PlexLyricSync.Core.Providers;
 
 namespace PlexLyricSync.Core.Utils;
 
 public static class LrcParser
 {
+    private static IPathProvider _pathProvider = new DefaultPathProvider();
+    public static void SetPathProvider(IPathProvider provider) => _pathProvider = provider;
+
     // [mm:ss] or [mm:ss.xx]
     private static readonly Regex Stamp = new(@"\[(\d{1,2}):(\d{2})(?:\.(\d{1,2}))?\](.*)", RegexOptions.Compiled);
 
@@ -36,7 +40,7 @@ public static class LrcParser
     /// <returns>Lyrics directory path</returns>
     private static string GetLyricsDirectory(string artist, string album)
     {
-        string music = Environment.GetFolderPath(Environment.SpecialFolder.MyMusic);
+        string music = _pathProvider.GetLyricsBasePath();
         string directory = Path.Combine(music, "PlexLyricSync", "lyrics", Sanitize(artist), Sanitize(album));
         Directory.CreateDirectory(directory);
         return directory;
@@ -50,7 +54,7 @@ public static class LrcParser
     /// <param name="title">track title</param>
     /// <param name="ct">cancellation token</param>
     /// <returns></returns>
-    public static async Task<Lyrics?> ReadLyricsAsync(string artist, string album, string title, CancellationToken ct)
+    public static async Task<LyricsFile?> ReadLyricsAsync(string artist, string album, string title, CancellationToken ct)
     {
         // file path
         string directory = GetLyricsDirectory(artist, album);
@@ -60,13 +64,13 @@ public static class LrcParser
         if (File.Exists(lrcPath))
         {
             string lrc = await File.ReadAllTextAsync(lrcPath, ct);
-            return new Lyrics(lrc, null, lrcPath);
+            return new LyricsFile(lrc, null, lrcPath);
         }
 
         if (File.Exists(txtPath))
         {
             string plain = await File.ReadAllTextAsync(txtPath, ct);
-            return new Lyrics(null, plain, txtPath);
+            return new LyricsFile(null, plain, txtPath);
         }
 
         return null;
@@ -75,28 +79,28 @@ public static class LrcParser
     /// <summary>
     /// Writes a lyrics file to disk based on track information.
     /// </summary>
-    /// <param name="lrcLibResponse">LRCLIB response to be written to disk</param>
+    /// <param name="lyricsFile">Lyrics file to be written to disk.</param>
     /// <param name="artist">track artist</param>
     /// <param name="album">track album</param>
     /// <param name="title">track title</param>
     /// <returns></returns>
-    public static Lyrics? WriteLyrics(Lyrics lrcLibResponse, string artist, string album, string title)
+    public static LyricsFile? WriteLyrics(LyricsFile lyricsFile, string artist, string album, string title)
     {
         // file path
         string directory = GetLyricsDirectory(artist, album);
         string lrcPath = Path.Combine(directory, Sanitize(title) + ".lrc");
         string txtPath = Path.Combine(directory, Sanitize(title) + ".txt");
 
-        if (!string.IsNullOrWhiteSpace(lrcLibResponse.Synced))
+        if (!string.IsNullOrWhiteSpace(lyricsFile.Synced))
         {
-            File.WriteAllText(lrcPath, lrcLibResponse.Synced);
-            return new Lyrics(lrcLibResponse.Synced, null, lrcPath);
+            File.WriteAllText(lrcPath, lyricsFile.Synced);
+            return new LyricsFile(lyricsFile.Synced, null, lrcPath);
         }
 
-        if (!string.IsNullOrWhiteSpace(lrcLibResponse.Plain))
+        if (!string.IsNullOrWhiteSpace(lyricsFile.Plain))
         {
-            File.WriteAllText(txtPath, lrcLibResponse.Plain);
-            return new Lyrics(null, lrcLibResponse.Plain, txtPath);
+            File.WriteAllText(txtPath, lyricsFile.Plain);
+            return new LyricsFile(null, lyricsFile.Plain, txtPath);
         }
 
         return null;

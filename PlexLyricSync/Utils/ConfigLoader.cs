@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Globalization;
 using System.IO;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml;
@@ -33,11 +32,7 @@ public static class ConfigLoader
             $"PlexBaseUrl: \"{cfg.PlexBaseUrl}\"{Environment.NewLine}" +
             $"PlexToken: \"{cfg.PlexToken}\"{Environment.NewLine}" +
             $"SyncedLyricLines: {cfg.SyncedLyricLines}{Environment.NewLine}" +
-            $"LibreTranslateBaseUrl: {cfg.LibreTranslateBaseUrl}{Environment.NewLine}" +
-            $"PreferredLanguage: \"{cfg.PreferredLanguage}\"{Environment.NewLine}" +
-            $"UseSystemLanguage: {cfg.UseSystemLanguage}{Environment.NewLine}" +
-            $"EnableTranslations: {cfg.EnableTranslations}{Environment.NewLine}" +
-            $"ShowTranslations: {cfg.ShowTranslations}{Environment.NewLine}");
+            $"ShowJapaneseTransliteration: {cfg.ShowJapaneseTransliteration}{Environment.NewLine}");
     }
 
     public static Config LoadConfigAsync()
@@ -94,27 +89,14 @@ public static class ConfigLoader
         string yaml = File.ReadAllText(path);
         IDeserializer deserializer = new DeserializerBuilder()
             .WithNamingConvention(PascalCaseNamingConvention.Instance)
+            .IgnoreUnmatchedProperties()
             .Build();
 
         Config cfg = deserializer.Deserialize<Config>(yaml);
 
-        if (!yaml.Contains("UseSystemLanguage:", StringComparison.OrdinalIgnoreCase))
+        if (!yaml.Contains("ShowJapaneseTransliteration:", StringComparison.OrdinalIgnoreCase))
         {
-            cfg.UseSystemLanguage = true;
-        }
-        if (!yaml.Contains("EnableTranslations:", StringComparison.OrdinalIgnoreCase))
-        {
-            cfg.EnableTranslations = false;
-        }
-        if (!yaml.Contains("ShowTranslations:", StringComparison.OrdinalIgnoreCase))
-        {
-            cfg.ShowTranslations = false;
-        }
-
-        // Determine effective preferred language (config or system)
-        if (cfg.UseSystemLanguage)
-        {
-            cfg.PreferredLanguage = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
+            cfg.ShowJapaneseTransliteration = false;
         }
 
         return cfg;
