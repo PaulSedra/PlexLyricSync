@@ -1,0 +1,4 @@
+interface:
+  display_name: "PlexLyricSync Development"
+  short_description: "Develop PlexLyricSync features"
+  default_prompt: "Use $plexlyricsync-development when changing PlexLyricSync code. Follow repo conventions, document new or changed methods, and validate with the testing workflow."
